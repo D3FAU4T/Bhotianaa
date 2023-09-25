@@ -5,11 +5,12 @@ import axios from 'axios';
 import express from 'express';
 import WebSocket from 'ws';
 import cors from 'cors'
-import { kukoroData, messageHandlerExclamation, messageHandlerWithoutExclamation, reset } from './Modules/kukoro';
+import { kukoroData, messageHandlerExclamation, messageHandlerWithoutExclamation, reset } from './src/Modules/kukoro';
 import { 
-  define, uptime, setgame, shoutout, setTitle, followage, cmds,
+  define, uptime, setgame,
+  shoutout, setTitle, followage, cmds,
   ToTitleCase, announceText
-} from './Modules/Stream';
+} from './src/Modules/Stream';
 
 interface ownWebSocket extends WebSocket {
   channel?: string;
@@ -47,18 +48,18 @@ app.post("/message", (req, res) => {
 })
 
 app.get('/kukoro', (_req, res) => {
-  let data: kukoroData = JSON.parse(readFileSync('./Resources/Kukoro.json', 'utf-8'));
+  let data: kukoroData = JSON.parse(readFileSync('./src/Resources/Kukoro.json', 'utf-8'));
   res.send(data)
 })
 
 app.post('/game', (req, res) => {
-  let data: kukoroData = JSON.parse(readFileSync('./Resources/Kukoro.json', 'utf-8'));
+  let data: kukoroData = JSON.parse(readFileSync('./src/Resources/Kukoro.json', 'utf-8'));
   let game: string = req.body.game;
   let returningData: kukoroData;;
   if (game == 'dungeon') {
     data.kukoroModuleToggle = true;
     data.kukoro.dungeon.active = true;
-    writeFileSync('./Resources/Kukoro.json', JSON.stringify(data, null, 2))
+    writeFileSync('./src/Resources/Kukoro.json', JSON.stringify(data, null, 2))
     returningData = reset(['sniper', 'oneTwoThree']);
     client.say("#gianaa_", `!kukoro`);
     client.say("#gianaa_", `!w !kukoro`);
@@ -67,13 +68,13 @@ app.post('/game', (req, res) => {
     data.kukoroModuleToggle = true;
     data.kukoro.sniper.active = true;
     data.kukoro.sniper.followMode = true;
-    writeFileSync('./Resources/Kukoro.json', JSON.stringify(data, null, 2));
+    writeFileSync('./src/Resources/Kukoro.json', JSON.stringify(data, null, 2));
     returningData = reset(['oneTwoThree', 'dungeon']);
     websocketData(returningData);
     client.say("#gianaa_", `!kukoro`);
   } else if (game == 'oneTwoThree') {
     data.kukoro.oneTwoThree.active = true;
-    writeFileSync('./Resources/Kukoro.json', JSON.stringify(data, null, 2))
+    writeFileSync('./src/Resources/Kukoro.json', JSON.stringify(data, null, 2))
     returningData = reset(['dungeon', 'sniper']);
     client.say("#gianaa_", `!kukoro`);
     websocketData(returningData);
@@ -89,13 +90,7 @@ const botServer = app.listen(6969);
 const wssDemo = new WebSocket.Server({ server: botServer });
 wssDemo.on('connection', onConnection);
 
-const headers = {
-  'Client-Id': process.env['clientId'],
-  'Authorization': process.env['auth'],
-  'Content-Type': 'application/json'
-}
-
-let links: { [channel: string]: string } = JSON.parse(readFileSync("./Resources/Links.json", 'utf-8'));
+let links: { [channel: string]: string } = JSON.parse(readFileSync("./src/Resources/Links.json", 'utf-8'));
 
 let BigWords: { [channel: string]: string[] } = {};
 let bwlastmessage: { [channel: string]: string } = {};
@@ -109,7 +104,7 @@ let pluslastmessage: { [channel: string]: string } = {};
 /* Simple command and response handler */
 client.on("message", async (channel, userstate, message, self) => {
   
-  let kukoroModuleToggle: kukoroData = JSON.parse(readFileSync('./Resources/Kukoro.json', 'utf-8'));
+  let kukoroModuleToggle: kukoroData = JSON.parse(readFileSync('./src/Resources/Kukoro.json', 'utf-8'));
 
   /* Kukoro Module */
   if (kukoroModuleToggle.kukoroModuleToggle == true) { // Extension toggle switch
@@ -177,7 +172,7 @@ client.on('message', async (channel, userstate, message, self) => {
     if (!args.length) client.say(channel, links[channel]); else {
       if (userstate.username == 'gianaa_' || userstate.username == 'd3fau4t') {
         links[channel] = args.join(' ');
-        writeFileSync("./Resources/Links.json", JSON.stringify(links))
+        writeFileSync("./src/Resources/Links.json", JSON.stringify(links))
         if (userstate.username == 'gianaa_') client.say(channel, `Updated the link, mamma ☺️`)
         else if (userstate.username == 'd3fau4t') client.say(channel, `Updated the link, pappa 🙃`)
         else client.say(channel, `Updated the link`)
@@ -190,8 +185,8 @@ client.on('message', async (channel, userstate, message, self) => {
     countCodeActive[channel] = true;
     BigWords[channel] = args.join(' ').toUpperCase().replace(/\p{Emoji}/gu, '').split('');
     //client.say(channel, `Nerdge letters --> ${BigWords[channel].join(' ')}`);
-    const data = await announceText('test', 'blue', headers);
-    console.log("DATA: ", data)
+    const data = await announceText('test', 'blue');
+    console.log("DATA: ", data);
     msgcount[channel] = 0;
     bwlastmessage[channel] = `${BigWords[channel].join(' ')}`;
   } else if (command == 'live' && channel == '#gianaa_') {
@@ -219,20 +214,20 @@ client.on('message', async (channel, userstate, message, self) => {
         console.error(err.response.data.errors)
       })
 
-    let gameName = await shoutout(args[0], headers)
+    let gameName = await shoutout(args[0])
     !gameName.length ? client.say(channel, `This is ${args[0]}. ${args[0]} joined my stream today. Be like ${args[0]} Okayge Check them out on https://www.twitch.tv/${args[0]} !`) : client.say(channel, `Everybody look at ${args[0]} on https://www.twitch.tv/${args[0]}. Look at them now! Pepega They were last seen playing ${gameName}!`)
   }
 
   else if (command == 'settitle') {
     if (!isModUp) return;
-    let data = await setTitle(argsR.join(' '), "518259240", headers);
+    let data = await setTitle(argsR.join(' '), "518259240");
     if (userstate.username == 'gianaa_') client.say(channel, `Mamma, updated the title to: ${data}`)
     else if (userstate.username == 'd3fau4t') client.say(channel, `Papai, new title: ${data}`)
     else client.say(channel, `Title updated to: ${data}`)
 
   }
   else if (command == 'setgame') {
-    let game = await setgame(argsR.join(' ').toLowerCase(), "518259240", headers)
+    let game = await setgame(argsR.join(' ').toLowerCase(), "518259240")
     if (userstate.username == 'gianaa_') client.say(channel, `Mamma, changed the game to ${game}`)
     else if (userstate.username == 'd3fau4t') client.say(channel, `Papai, Mamma is playing new game: ${game} VoHiYo`)
     else client.say(channel, `Game updated to: ${game}`)
@@ -252,10 +247,10 @@ client.on('message', async (channel, userstate, message, self) => {
     if (data == 'gianaa_ is offline') client.say(channel, `Shhh, my mamma is sleeping, do not disturb her`)
     else client.say(channel, `My mamma has been live for ${data} blobDance`)
   } else if (command == 'death') {
-    let data = JSON.parse(readFileSync("./Resources/metadata.json", 'utf-8'));
+    let data = JSON.parse(readFileSync("./src/Resources/metadata.json", 'utf-8'));
     if (argsR[0] == 'reset') data.counters['fall guys'] = 0;
     else data.counters['fall guys'] += 1;
-    writeFileSync("./Resources/metadata.json", JSON.stringify(data, null, 2));
+    writeFileSync("./src/Resources/metadata.json", JSON.stringify(data, null, 2));
     if (data.counters['fall guys'] == 0) client.say(channel, `The times my mamma died is... no my mamma never died UHMDude`);
     else client.say(channel, `WHO KILLED MY MAMMA??? She died ${data.counters['fall guys']} times 🔪🔪`)
   }
@@ -276,11 +271,11 @@ function onConnection(ws: ownWebSocket, _req: any) {
       ws.channel = message.Client[1].channel;
       ws.send(`{ "Server": ["GG bhai", {"message" : "Successfully added the channel, await for information"} ] }`);
     } else if (message.Client[0] == "Handshake") {
-      let kukoroData = readFileSync('./Resources/Kukoro.json', 'utf-8')
+      let kukoroData = readFileSync('./src/Resources/Kukoro.json', 'utf-8')
       let settingsData = `{ "Server": [ "GG", { "message": ${kukoroData} } ] }`
       ws.send(settingsData)
     } else if (message.Client[0] == 'fetchData') {
-      let kukoroData = readFileSync('./Resources/Kukoro.json', 'utf-8')
+      let kukoroData = readFileSync('./src/Resources/Kukoro.json', 'utf-8')
       let settingsData = `{ "Server": [ "GG", { "message": ${kukoroData} } ] }`; 
       ws.send(settingsData)
 
@@ -288,10 +283,10 @@ function onConnection(ws: ownWebSocket, _req: any) {
     } else if (message.Client[0] == 'updateToggleData') {     
 
       
-      let kukoroData = JSON.parse(readFileSync('./Resources/Kukoro.json', 'utf-8'));
+      let kukoroData = JSON.parse(readFileSync('./src/Resources/Kukoro.json', 'utf-8'));
       if (message.Client[1].message == 'true') kukoroData.kukoroModuleToggle = true 
       else kukoroData.kukoroModuleToggle = false;      
-      writeFileSync('./Resources/Kukoro.json', JSON.stringify(kukoroData, null, 2)); 
+      writeFileSync('./src/Resources/Kukoro.json', JSON.stringify(kukoroData, null, 2)); 
       let mode; // Could be this undefined Better log on client side O_o
       if (kukoroData.kukoroModuleToggle == true) mode = "Kukoro Module turned on"
       else {
