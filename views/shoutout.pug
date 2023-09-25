@@ -1,0 +1,139 @@
+doctype html
+head
+  title d3fau4tbot shoutout
+  link(rel='stylesheet', href='https://streamgood.gg/css/clip-player.css')
+.player_container
+video#player(style='width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: -1;', src='')
+#timer.hide
+#overlay.overlayText.hide
+h1#checkout.checkout.hide
+  | check out&nbsp;
+  span#broadcaster_name
+script.
+  let overlayText = null;
+  let checkout = null;
+  let broadcaster_name = null;
+  let VOLUME_PERCENT = 100;
+  let SHOW_CLIP_CREATORS = true;
+  let MAX_LENGTH = 20;
+  let SHOW_TIMER = true;
+  let overlayTimer = null;
+  let currentTimer = null;
+  let finishEarlyTimer = null;
+  let isPlaying = false;
+  let queuedclips = [];
+  const socket = new WebSocket('wss://bhotianaa.giiana.repl.co/gianaa_/shoutout:6969')
+  socket.addEventListener("open", function (event) {
+  let url = window.location.href;
+  let channel = url.slice(url.indexOf('.co/') + 4, url.indexOf('/shoutout'));
+  socket.send(`{ "Client": ["Ola bhai", {"channel" : "${channel}"}]}`);
+  })
+  socket.addEventListener("message", function (event) {
+  let message = JSON.parse(event.data)
+  console.log(event.data)
+  if (message.Ping === 'Kya tum yahaan pe ho bhai?') {
+    socket.send(`{ "Pong" : "Sim bhai, estou aqui!" }`)
+  } else if (message.Server[0] == 'Mostrar bhai') {
+  console.log(message.Server[1])
+  queuedclips.push(message.Server[1]);
+  if (!isPlaying) {
+  playNextClip(queuedclips.shift());
+  }
+  }
+  })
+  function setupPlayer() {
+  var player = document.getElementById("player");
+  player.load();
+  player.loop = false;
+  player.controls = false;
+  player.volume = VOLUME_PERCENT / 100;
+  player.addEventListener("ended", cleanup);
+  }
+  function cleanup() {
+  isPlaying = false;
+  checkout.className = "checkout hide";
+  overlayText.className = "overlayText hide";
+  timerText.className = "hide";
+  var player = document.getElementById("player");
+  player.paused = true;
+  player.src = "";
+  if (queuedclips.length > 0) {
+  playNextClip(queuedclips.shift());
+  }
+  }
+  async function playNextClip(clip) {
+  isPlaying = true;
+  if (overlayTimer) {
+  clearTimeout(overlayTimer);
+  }
+  if (currentTimer) {
+  clearInterval(currentTimer);
+  }
+  if (finishEarlyTimer) {
+  clearTimeout(finishEarlyTimer);
+  }
+  var player = document.getElementById("player");
+  player.pause();
+  player.src = clip.clip_url;
+  broadcaster_name.innerText = clip.channel;
+  checkout.className = "checkout";
+  player.play();
+  finishEarlyTimer = setTimeout(function () {
+  cleanup();
+  }, MAX_LENGTH * 1000);
+  if (SHOW_TIMER == true) {
+  var duration = Math.floor(clip.duration) - 1;
+  timerText.innerHTML = duration;
+  currentTimer = setTimer(duration, timerText);
+  timerText.className = "";
+  }
+  function cleanUp() { }
+  function setTimer(seconds, timerText) {
+  var downloadTimer = setInterval(function () {
+  if (seconds <= 0) {
+  clearInterval(downloadTimer);
+  }
+  timerText.innerHTML = seconds;
+  seconds -= 1;
+  }, 1000);
+  return downloadTimer;
+  }
+  if (SHOW_CLIP_CREATORS == true) {
+  let dateOptions = {
+  year: "numeric",
+  month: "long",
+  day: "numeric"
+  };
+  let date = new Date(clip.created_at);
+  overlayText.innerHTML = `<h1>${clip.title
+  }</h1><p class="gameinfo">While streaming ${clip.game_title
+  }</p><p>Clipped by ${clip.creator_name} on ${date.toLocaleDateString(
+  "en-US",
+  dateOptions
+  )}</p>`;
+  overlayText.className = "overlayText";
+  overlayTimer = setTimeout(function () {
+  overlayText.className = "overlayText hide";
+  }, 10000);
+  }
+  }
+  function videoControlHandler() {
+  var action = window.localStorage.getItem("action");
+  window.localStorage.clear();
+  switch (action) {
+  case "stop":
+  stop();
+  }
+  }
+  function run() {
+  overlayText = document.getElementById("overlay");
+  checkout = document.getElementById("checkout");
+  timerText = document.getElementById("timer");
+  broadcaster_name = document.getElementById("broadcaster_name");
+  setupPlayer();
+  }
+  function stop() {
+  cleanup();
+  }
+  window.addEventListener("storage", videoControlHandler);
+  window.addEventListener("load", run);

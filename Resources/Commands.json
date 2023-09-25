@@ -1,0 +1,67 @@
+{
+    "#gianaa_": {
+        "commands": {
+            "hug": {
+                "value": "/me thanks for being here ${username}! pepeL",
+                "useParser": true
+            },
+            "lurk": {
+                "value": "/me ${username} is now lurking! thats not weird or anything.. monkaHmm",
+                "useParser": true
+            },
+            "hate": {
+                "value": "/me ${username} hates ${target} as much as I do T^T",
+                "useParser": true
+            },
+            "dance": {
+                "value": "peepoDJ *twerks* amongAss",
+                "useParser": false
+            },
+            "bug": {
+                "value": "It was not the streamer's fault, it was the game that got bugged Keepo",
+                "useParser": false
+            },
+            "discord": {
+                "value": "This is a thing now, I guess. Nobody be weird! MYAA https://discord.gg/PAZTR8tdq5",
+                "useParser": false
+            },
+            "epic": {
+                "value": "NOTED add a terrible player ➜ giiana_",
+                "useParser": false
+            },
+            "raid": {
+                "value": "gianaa_ kicked us out BibleThump BibleThump",
+                "useParser": false
+            },
+            "cursed": {
+                "value": "CursedYep cursed internet, cursed soundboard, we love that though CursedYep",
+                "useParser": false
+            },
+            "bomb": {
+                "value": "gianaaBomb",
+                "useParser": false
+            }
+        },
+        "messages": {
+            "hello": {
+                "value": "Hi I'm bhotianaa_! gianaa_'s daughter gianaaHi",
+                "useParser": false
+            },
+            "+++ !continue": {
+                "value": "Go uncle ${username}!!",
+                "useParser": true
+            },
+            "bye": {
+                "value": "*twerks backwards* amongAss",
+                "useParser": false
+            },
+            "^": {
+                "value": "^",
+                "useParser": false
+            }
+        },
+        "Includes": {
+            "key": "value"
+        }
+    }
+}
