@@ -4,3 +4,6 @@
 .upm
 replit.nix
 node_modules
+/dist
+/.vscode
+/src/Tests/*
