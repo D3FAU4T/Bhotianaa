@@ -111,16 +111,18 @@ export const cmds = (channel: string, userstate: ChatUserstate, message: string,
   } else if (cmd[channel].commands[command] && cmd[channel].commands[command].useParser === false) return cmd[channel].commands[command].value
 }
 
-export const announceText = async (text: string, color?: "primary" | "blue" | "green" | "orange" | "purple") => {
+export const announceText = async (text: string, color?: "primary" | "blue" | "green" | "orange" | "purple"): Promise<boolean> => {
   try {
     const sendingData = {
       message: text,
       color: color || "primary"
     };
 
-    const { data } = await axios.post(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=518259240&moderator_id=836876180`, sendingData, { headers: twitchHeaders });
-    return data;
-  } catch (err) {
-    return err;
+    const { data } = await axios.post(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=518259240&moderator_id=518259240`, sendingData, { headers: twitchHeaders });
+    return true;
+  } catch (error) {
+    const err = error as AxiosError<{ message: string; error: string; status: number }>;
+    console.error(err.response?.data);
+    return false;
   }
 }
