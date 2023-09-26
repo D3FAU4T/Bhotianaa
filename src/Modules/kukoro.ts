@@ -28,7 +28,7 @@ export interface messageHandler {
   websocket: kukoroData
 }
 
-let resources: kukoroData = JSON.parse(readFileSync("./Resources/Kukoro.json", 'utf-8'));
+let resources: kukoroData = JSON.parse(readFileSync("./src/Resources/Kukoro.json", 'utf-8'));
 
 // with exclamation
 // It works like a twitch message handler, except it returns message with settings
@@ -44,7 +44,7 @@ export async function messageHandlerExclamation(channel: string, userstate: Chat
   if (command == 'follow' && resources.kukoro.sniper.active == true) {
     resources.kukoro.sniper.followMode = true;
     resources.kukoro.sniper.follower = args[0].toLowerCase();
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     return { "messages": [`I'm now following ${args[0]}`], "websocket": resources }
   }
 
@@ -56,7 +56,7 @@ export async function messageHandlerExclamation(channel: string, userstate: Chat
   else if (command == 'newcategory' && isModUp) {
     resources.kukoro.dungeon.categories[args[0]] = [];
     resources.kukoro.dungeon.types.push(args[0])
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     if (userstate.username == 'gianaa_') return { "messages": [`Mamma, I made a new cateogry: ${args[0]}`], "websocket": resources }
     else if (userstate.username == 'd3fau4t') return { "messages": [`Papa Papa, look we have a new enemy: ${args[0]}`], "websocket": resources }
     else return { "messages": [`Added new category: ${args[0]}`], "websocket": resources }
@@ -67,20 +67,20 @@ export async function messageHandlerExclamation(channel: string, userstate: Chat
       resources = reset(['sniper', 'oneTwoThree'])
       resources.kukoro.dungeon.active = true;
       // console.log('LOG JOIN DUNGEON: ', resources)
-      writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
       return { "messages": ["!kukoro", "!w !kukoro"], "websocket": resources }
     }
     else if (args[0] == 'sniper') {
       resources = reset(['dungeon', 'oneTwoThree'])
       resources.kukoro.sniper.active = true;
       resources.kukoro.sniper.followMode = true;
-      writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
       return { "messages": ["!kukoro", "!w !kukoro"], "websocket": resources }
     }
     else if (args[0] == '123') {
       resources = reset(['dungeon', 'sniper'])
       resources.kukoro.oneTwoThree.active = true;
-      writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
       return { "messages": ["!kukoro"], "websocket": resources }
     }
   }
@@ -90,13 +90,13 @@ export async function messageHandlerExclamation(channel: string, userstate: Chat
   }
   else if (command == 'followon') {
     resources.kukoro.sniper.followMode = true;
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     return { "messages": [`Follow mode turned on. I'm following ${resources.kukoro.sniper.follower}!`], "websocket": resources }
   }
 
   else if (command == 'followoff') {
     resources.kukoro.sniper.followMode = false;
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     return { "messages": [`Follow mode turned off.`], "websocket": resources }
   }
 
@@ -107,13 +107,13 @@ export async function messageHandlerExclamation(channel: string, userstate: Chat
     if (args[1]) {
       if (resources.kukoro.dungeon.categories[args[0]].includes(args[1])) return { "messages": [`Uncle ${args[1]} is already in the category ${args[0]}`], "websocket": resources }
       resources.kukoro.dungeon.categories[args[0]].push(args[1])
-      writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
       return { "messages": [`Uncle ${args[1]} added to the ${args[0]} category`], "websocket": resources }
     } else {
       if (typeof(userstate.username) === 'undefined') return;
       if (resources.kukoro.dungeon.categories[args[0]].includes(userstate.username)) return { "messages": [`Uncle ${userstate.username}, you're already in the category ${args[0]}`], "websocket": resources }
       resources.kukoro.dungeon.categories[args[0]].push(userstate.username)
-      writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
       return { "messages": [`Uncle ${userstate.username} added to the ${args[0]} category`], "websocket": resources }
     }
   }
@@ -142,12 +142,12 @@ export async function messageHandlerWithoutExclamation(_channel: string, usersta
 
   if (resources.kukoro.oneTwoThree.active == true && message.includes('[KUKORO] <<< YOU CAN MOVE! >>>')) {
     resources.kukoro.oneTwoThree.status = "Walking";
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     return { "messages": ["!go"], "websocket": resources }
   }
   else if (resources.kukoro.oneTwoThree.active == true && message.includes('[KUKORO] <<< STOP! >>>')) {
     resources.kukoro.oneTwoThree.status = "Halted";
-    writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
     return { "messages": ["!stop"], "websocket": resources }
   }
   else if (message.includes('[KUKORO] RAID IS OVER >>>')) {
@@ -165,7 +165,7 @@ export async function messageHandlerWithoutExclamation(_channel: string, usersta
       if (part === part.toUpperCase()) {
         if (part.includes('/') || part.includes('[') || part == 'DNA') return;
         resources.kukoro.sniper.follower = part.replaceAll('.', '').toLowerCase();
-        writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+        writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
         return { "messages": [`I'm now following ${resources.kukoro.sniper.follower}`], "websocket": resources }
       }
     });
@@ -173,7 +173,7 @@ export async function messageHandlerWithoutExclamation(_channel: string, usersta
     partMsg.forEach(word => {
       if (word.includes("’")) {
         resources.kukoro.sniper.follower = word.toLowerCase().slice(0, -2)
-        writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+        writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
         return { "messages": [`I'm now following ${resources.kukoro.sniper.follower}`], "websocket": resources }
       }
     });
@@ -183,7 +183,7 @@ export async function messageHandlerWithoutExclamation(_channel: string, usersta
 }
 
 export function reset(game: string[]): kukoroData {
-  let resources: kukoroData = JSON.parse(readFileSync("./Resources/Kukoro.json", 'utf-8'))
+  let resources: kukoroData = JSON.parse(readFileSync("./src/Resources/Kukoro.json", 'utf-8'))
   game.forEach(category => {
     if (category == 'sniper') {
       resources.kukoro.sniper.active = false;
@@ -198,7 +198,7 @@ export function reset(game: string[]): kukoroData {
       Object.keys(resources.kukoro.dungeon.categories).forEach(element => resources.kukoro.dungeon.categories[element] = []);
     }
   })
-  writeFileSync("./Resources/Kukoro.json", JSON.stringify(resources, null, 2))
+  writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
   return resources;
 }
 
