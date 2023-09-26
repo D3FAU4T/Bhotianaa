@@ -184,9 +184,8 @@ client.on('message', async (channel, userstate, message, self) => {
   else if (command === 'bw') {
     countCodeActive[channel] = true;
     BigWords[channel] = args.join(' ').toUpperCase().replace(/\p{Emoji}/gu, '').split('');
-    //client.say(channel, `Nerdge letters --> ${BigWords[channel].join(' ')}`);
-    const data = await announceText('test', 'blue');
-    console.log("DATA: ", data);
+    const data = await announceText(BigWords[channel].join(' '), 'blue');
+    if (!data) client.say(channel, `Nerdge letters --> ${BigWords[channel].join(' ')}ㅤ`);
     msgcount[channel] = 0;
     bwlastmessage[channel] = `${BigWords[channel].join(' ')}`;
   } else if (command == 'live' && channel == '#gianaa_') {
