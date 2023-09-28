@@ -44,3 +44,23 @@ export interface TwitchAPIStandardError {
     status: number;
     message: string;
 }
+
+export interface StreamGoodClips {
+    creator_name: string;
+    clip_url: string;
+    game_title: string;
+    title: string;
+    created_at: string;
+    duration: number;
+    channel: string;
+    is_overriden: boolean;
+}
+
+export interface StreamGoodClipsError {
+    errors: {
+        value: string;
+        msg: string;
+        param: string;
+        location: string;
+    }[]
+}
