@@ -31,21 +31,19 @@ client.connect().catch(console.error);
 
 /* 24/7 online code */
 const app = express();
-app.set('views', './views');
+app.set('views', './src/views');
 app.set('view engine', 'pug');
-app.use(express.json())
-app.use(cors())
-app.get("/", (_req, res) => res.send("Hoyaaaa"))
-app.get('/:channel/shoutout', (_req, res) => {
-  res.render('shoutout');
-});
+app.use(express.json());
+app.use(cors());
+app.get("/", (_req, res) => res.send("Hoyaaaa"));
+app.get('/:channel/shoutout', (_req, res) => res.render('shoutout'));
 
 app.post("/message", (req, res) => {
-  client.say(req.body.channel, req.body.message)
+  client.say(req.body.channel, req.body.message);
   res.send({
     "message": "Message sent to channel successfully"
-  })
-})
+  });
+});
 
 app.get('/kukoro', (_req, res) => {
   let data: kukoroData = JSON.parse(readFileSync('./src/Resources/Kukoro.json', 'utf-8'));
@@ -84,7 +82,7 @@ app.post('/game', (req, res) => {
     websocketData(returningData);
   }
   res.send("Game changed successfully")
-})
+});
 
 const botServer = app.listen(6969);
 const wssDemo = new WebSocket.Server({ server: botServer });
