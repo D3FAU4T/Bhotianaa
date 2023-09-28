@@ -1,1 +1,60 @@
-{"dungeon":{"dungeonMode":true,"types":["Bats","Cyclops","Dragon","Goblin","Human (Usually boss only)","Imp","Lizard","Minotaur","Momba","Orc","Skeleton","Slime","Spider","Troll","Wolf","Zombie"],"categories":{"bats":[],"cyclops":[],"dragon":[],"goblin":[],"human":[],"imp":[],"lizard":[],"minotaur":["matanxd1"],"momba":[],"orc":["notsoclear","matanxd1"],"shadow":[],"skeleton":[],"slime":[],"spider":[],"troll":["gianaa_","bhotianaa_"],"wolf":[],"zombie":["prateek_n"]}},"sniper":{"sniperMode":false,"followMode":false,"follower":"yetanotherd3fau4t"},"oneTwoThree":{"oneTwoThreeMode":false}}
+{
+    "dungeon": {
+        "dungeonMode": true,
+        "types": [
+            "Bats",
+            "Cyclops",
+            "Dragon",
+            "Goblin",
+            "Human (Usually boss only)",
+            "Imp",
+            "Lizard",
+            "Minotaur",
+            "Momba",
+            "Orc",
+            "Skeleton",
+            "Slime",
+            "Spider",
+            "Troll",
+            "Wolf",
+            "Zombie"
+        ],
+        "categories": {
+            "bats": [],
+            "cyclops": [],
+            "dragon": [],
+            "goblin": [],
+            "human": [],
+            "imp": [],
+            "lizard": [],
+            "minotaur": [
+                "matanxd1"
+            ],
+            "momba": [],
+            "orc": [
+                "notsoclear",
+                "matanxd1"
+            ],
+            "shadow": [],
+            "skeleton": [],
+            "slime": [],
+            "spider": [],
+            "troll": [
+                "gianaa_",
+                "bhotianaa_"
+            ],
+            "wolf": [],
+            "zombie": [
+                "prateek_n"
+            ]
+        }
+    },
+    "sniper": {
+        "sniperMode": false,
+        "followMode": false,
+        "follower": "yetanotherd3fau4t"
+    },
+    "oneTwoThree": {
+        "oneTwoThreeMode": false
+    }
+}
