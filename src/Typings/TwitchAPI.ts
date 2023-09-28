@@ -38,3 +38,9 @@ export interface GetGames {
         igdb_id: ''
     }[];
 }
+
+export interface TwitchAPIStandardError {
+    error: string;
+    status: number;
+    message: string;
+}
