@@ -3,8 +3,10 @@ import axios, { AxiosError } from "axios";
 import { appendFileSync } from "fs";
 import { ChatUserstate, Client } from "tmi.js";
 import { promisify } from "util";
+import { remove } from "remove-accents";
 import { AnnounceColors, CommandsInterface, LogErrorPath } from "../Typings/Core";
-import { StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
+import { GetChannel, GetGames, GetUser, StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
+import { DictionaryAPI, OxfordDictionaryAPI } from "../Typings/DictionaryAPI";
 
 const globPromise = promisify(glob);
 
@@ -21,10 +23,11 @@ export class Bhotianaa extends Client {
     private BigWordMessageCount: number;
     private CustomCommands: Map<string, CommandsInterface>;
 
-    private static readonly TwitchHeaders = {
-        'Client-Id': process.env['clientId'],
-        'Authorization': process.env['auth'],
-        'Content-Type': 'application/json'
+    private static readonly TwitchHeaders = Bhotianaa.MakeHeader(false);
+    private static readonly TwitchStreamerHeaders = Bhotianaa.MakeHeader(true);
+    private static readonly DictionaryHeaders = {
+        'app_id': process.env['OD_ID'],
+        'app_key': process.env['OD_KEY']
     };
 
     constructor(ChannelName: string) {
@@ -44,6 +47,14 @@ export class Bhotianaa extends Client {
         this.CustomCommands = new Map();
     }
 
+    private static MakeHeader(StreamerMode: boolean) {
+        return {
+            'Client-Id': process.env['clientId'],
+            'Authorization': StreamerMode ? process.env['authStreamer'] : process.env['auth'],
+            'Content-Type': 'application/json'
+        }
+    }
+
     public async Start(): Promise<void> {
         await this.LoadCustomCommands().catch(console.error);
         await this.connect().catch(console.error);
@@ -53,12 +64,12 @@ export class Bhotianaa extends Client {
 
             if (!self) {
                 if (this.BigWordActive) this.BigWordMessageCount++;
-    
+
                 if (this.BigWordActive && this.BigWordMessageCount === 7) {
                     this.say(channel, `Nerdge letters --> ${this.BigWord}`);
                     this.BigWordMessageCount = 0;
                 }
-            }            
+            }
 
             // Commands Handler
             if (message.startsWith('!')) {
@@ -70,7 +81,7 @@ export class Bhotianaa extends Client {
         });
     }
 
-    public async ImportFile<T>(FilePath: string) {
+    public async ImportFile<T>(FilePath: string): Promise<T> {
         return await require(FilePath) as T;
     }
 
@@ -115,7 +126,7 @@ export class Bhotianaa extends Client {
         }
     }
 
-    public async FetchRandomClip(ChannelName: string): Promise<StreamGoodClips | StreamGoodClipsError | null> {
+    public async GetRandomClip(ChannelName: string): Promise<StreamGoodClips | StreamGoodClipsError | null> {
         try {
             const { data } = await axios.get<StreamGoodClips | StreamGoodClipsError>(`https://streamgood.gg/shoutout/api?channel=${ChannelName}&mode=random&last_game=true&max_length=60&filter_long_videos=true`);
             return data;
@@ -129,5 +140,94 @@ export class Bhotianaa extends Client {
 
     public HasModPermissions(Channel: string, UserState: ChatUserstate): boolean {
         return UserState.mod || UserState["user-type"] === 'mod' || UserState.username === Channel.slice(1);
+    }
+
+    public async GetUserData(Username: string): Promise<GetUser | null> {
+        try {
+            const { data } = await axios.get<GetUser>(`https://api.twitch.tv/helix/users?login=${Username}`, { headers: Bhotianaa.TwitchStreamerHeaders });
+            return data;
+        } catch (error) {
+            const err = error as AxiosError<TwitchAPIStandardError>;
+            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
+            console.error(err.response?.data);
+            return null;
+        }
+    }
+
+    public async GetChannelData(BroadcasterID: string | number): Promise<GetChannel | null> {
+        try {
+            const { data } = await axios.get<GetChannel>(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { headers: Bhotianaa.TwitchStreamerHeaders });
+            return data;
+        } catch (error) {
+            const err = error as AxiosError<TwitchAPIStandardError>;
+            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
+            console.error(err.response?.data);
+            return null;
+        }
+    }
+
+    public async GetUptime(ChannelName: string): Promise<string> {
+        try {
+            const { data } = await axios.get<string>(`https://decapi.me/twitch/uptime?channel=${ChannelName}`);
+            return data;
+        } catch (err) {
+            return 'An error occurred while executing this command'
+        }
+    }
+
+    public async GetGame(GameName: string): Promise<GetGames | null> {
+        try {
+            const { data } = await axios.get<GetGames>(`https://api.twitch.tv/helix/games?name=${GameName}`, { headers: Bhotianaa.TwitchHeaders });
+            return data;
+        } catch (error) {
+            const err = error as AxiosError<TwitchAPIStandardError>;
+            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
+            console.error(err.response?.data);
+            return null;
+        }
+    }
+
+    public SetGame(BroadcasterID: string | number, GameID: string | number): boolean {
+        try {
+            axios.patch(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { 'game_id': `${GameID}` }, { headers: Bhotianaa.TwitchStreamerHeaders });
+            return true;
+        } catch (error) {
+            const err = error as AxiosError<TwitchAPIStandardError>;
+            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
+            console.error(err.response?.data);
+            return false;
+        }
+    }
+
+    public SetTitle(BroadcasterID: string | number, Title: string): boolean {
+        try {
+            axios.patch(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { "title": Title }, { headers: Bhotianaa.TwitchStreamerHeaders });
+            return true;
+        } catch (error) {
+            const err = error as AxiosError<TwitchAPIStandardError>;
+            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
+            console.error(err.response?.data);
+            return false;
+        }
+    }
+
+    public async DefineWord(Word: string): Promise<string> {
+        if (Word == undefined || Word == null || Word.length == 0) return "This command is used for defining words. Usage: !define <word>";
+
+        const WordId = remove(Word);
+        let data = '';
+
+        try {
+            const res = await axios.get<OxfordDictionaryAPI>(`https://od-api.oxforddictionaries.com/api/v2/entries/en-gb/${WordId}?fields=definitions&strictMatch=false`, { headers: Bhotianaa.DictionaryHeaders });
+            data = res.data.results[0].lexicalEntries[0].entries[0].senses[0].definitions[0];
+        } catch (err) {
+            try {
+                const resp = await axios.get<DictionaryAPI[]>(`https://api.dictionaryapi.dev/api/v2/entries/en/${WordId}`);
+                data = `${Word}: ${resp.data[0].meanings[0].definitions[0].definition}`;
+            } catch (error) {
+                data = `Oh no, I don't know the definition of ${Word}, Mamma help D:`;
+            }
+        }
+        return data;
     }
 }

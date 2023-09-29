@@ -45,6 +45,12 @@ export interface TwitchAPIStandardError {
     message: string;
 }
 
+export interface TwitchHeaders {
+    'Client-Id': string;
+    Authorization: string;
+    'Content-Type': 'application/json';
+}
+
 export interface StreamGoodClips {
     creator_name: string;
     clip_url: string;

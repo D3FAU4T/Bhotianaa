@@ -6,6 +6,7 @@ declare global {
             OD_KEY: string;
             clientId: string;
             auth: string;
+            authStreamer: string;
         }
     }
 }
