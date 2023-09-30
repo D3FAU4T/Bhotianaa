@@ -9,6 +9,14 @@ type RunOptions = {
 }
 
 export interface CommandsInterface {
+    default: {
+        Name: string;
+        Description: string;
+        Run: (Options: RunOptions, Client: Bhotianaa) => void;
+    }
+}
+
+export interface CommandsInterfaceDefault {
     Name: string;
     Description: string;
     Run: (Options: RunOptions, Client: Bhotianaa) => void;

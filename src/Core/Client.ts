@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { ChatUserstate, Client } from "tmi.js";
 import { promisify } from "util";
 import { remove } from "remove-accents";
-import { AnnounceColors, CommandsInterface, LogErrorPath } from "../Typings/Core";
+import { AnnounceColors, CommandsInterface, CommandsInterfaceDefault, LogErrorPath } from "../Typings/Core";
 import { GetChannel, GetGames, GetUser, StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
 import { DictionaryAPI, OxfordDictionaryAPI } from "../Typings/DictionaryAPI";
 
@@ -23,7 +23,7 @@ export class Bhotianaa extends Client {
 
     private BigWordActive: boolean;
     private BigWordMessageCount: number;
-    public CustomCommands: Map<string, CommandsInterface>;
+    public CustomCommands: Map<string, CommandsInterfaceDefault>;
 
     private static readonly TwitchHeaders = Bhotianaa.MakeHeader(false);
     private static readonly TwitchStreamerHeaders = Bhotianaa.MakeHeader(true);
@@ -87,7 +87,7 @@ export class Bhotianaa extends Client {
                 if (Command) Command.Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
             }
 
-            else if (message === ']') this.CustomCommands.get(']').Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
+            else if (message === ']') this.CustomCommands.get(']')?.Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
         });
     }
 
