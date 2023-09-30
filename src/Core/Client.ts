@@ -62,8 +62,6 @@ export class Bhotianaa extends Client {
     public async Start(): Promise<void> {
         await this.LoadCustomCommands().catch(console.error);
         await this.connect().catch(console.error);
-
-        console.log(this.TemporaryLink)
       
         this.on('message', (channel, userstate, message, self) => {
             if (message.startsWith('/')) return;
@@ -82,8 +80,6 @@ export class Bhotianaa extends Client {
                 const [CommandName, ...CommandArgs] = message.split(' ');
                 const Command = this.CustomCommands.get(CommandName.slice(1).toLowerCase());
 
-                console.log(CommandName);
-
                 if (Command) Command.Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
             }
 
@@ -91,17 +87,16 @@ export class Bhotianaa extends Client {
         });
     }
 
-    public async importFile(filePath: string) {
-        return await require(filePath);
+    public async ImportFile<T>(filePath: string): Promise<T> {
+        return await require(filePath) as T;
     }
 
     public async LoadCustomCommands(): Promise<void> {
         const CommandFiles = await globPromise(`${__dirname}/../Commands/*{.ts,.js}`);
 
         CommandFiles.forEach(async FilePath => {
-            const command = await this.importFile(FilePath) as CommandsInterface;
-            console.log(command, command.default.Name)
-            this.CustomCommands.set(command.default.Name, command.default);
+            const Command = await this.ImportFile<CommandsInterface>(FilePath);
+            this.CustomCommands.set(Command.default.Name, Command.default);
         });
     }
 
