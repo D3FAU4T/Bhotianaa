@@ -3,8 +3,9 @@ import { Command } from "../Core/Client";
 export default new Command({
     Name: 'bw',
     Description: 'Sets the big word',
-    Run: ({ Message }, Client) => {
+    Run: ({ Message, Channel }, Client) => {
         const [CommandName, ...CommandArgs] = Message.split(' ');
-        Client.SetBigWord(CommandArgs.join(' '));
+        const IsAnnounced = Client.SetBigWord(CommandArgs.join(' '));
+        if (IsAnnounced !== null) Client.say(Channel, IsAnnounced);
     }
 })

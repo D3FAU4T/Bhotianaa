@@ -1,6 +1,6 @@
 import glob from "glob";
 import axios, { AxiosError } from "axios";
-import { appendFileSync } from "fs";
+import { appendFileSync, readFileSync } from "fs";
 import { ChatUserstate, Client } from "tmi.js";
 import { promisify } from "util";
 import { remove } from "remove-accents";
@@ -19,6 +19,8 @@ export class Command {
 export class Bhotianaa extends Client {
 
     public BigWord: string | null;
+    public TemporaryLink: string | null;
+
     private BigWordActive: boolean;
     private BigWordMessageCount: number;
     private CustomCommands: Map<string, CommandsInterface>;
@@ -45,6 +47,8 @@ export class Bhotianaa extends Client {
         this.BigWordActive = false;
         this.BigWordMessageCount = 0;
         this.CustomCommands = new Map();
+
+        this.TemporaryLink = (JSON.parse(readFileSync('./src/Resources/Links.json', 'utf-8')) as { Link: string; }).Link;
     }
 
     private static MakeHeader(StreamerMode: boolean) {
@@ -229,5 +233,9 @@ export class Bhotianaa extends Client {
             }
         }
         return data;
+    }
+
+    public SetLink(Link: string): void {
+        this.TemporaryLink = Link;
     }
 }
