@@ -7,7 +7,7 @@ export default new Command({
     Run: ({ Message, Channel, UserState }, Client) => {
         const args = Message.substring(1).split(' ');
 
-        if (!args.length) Client.say(Channel, `${Client.TemporaryLink}`);
+        if (!args[1]) Client.say(Channel, `${Client.TemporaryLink}`);
         
         else {
             const IsModOrBroadcaster = Client.HasModPermissions(Channel, UserState);

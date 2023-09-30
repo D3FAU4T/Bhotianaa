@@ -5,6 +5,6 @@ export default new Command({
     Description: 'Unsets the Big Word and stops it\'s repeation',
     Run: ({ Channel }, Client) => {
         Client.UnsetBigWord();
-        Client.say(Channel, '[INFO]: Big Word trigger removed.');
+        Client.say(Channel, 'Big Word trigger removed  PepeHands');
     }
 })
