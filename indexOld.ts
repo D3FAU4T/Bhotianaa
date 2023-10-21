@@ -200,11 +200,7 @@ client.on('message', async (channel, userstate, message, self) => {
       .then(res => {
         if (res.data === "") return;
         wssDemo.clients.forEach((client: ownWebSocket) => {
-          if (client.hasOwnProperty("channel")) {
-            if (client.channel === channel.slice(1)) {
-              client.send(`{ "Server": ["Mostrar bhai", ${JSON.stringify(res.data)} ] }`)
-            }
-          }
+          if (client.hasOwnProperty("channel") && client.channel === channel.slice(1)) client.send(`{ "Server": ["Mostrar bhai", ${JSON.stringify(res.data)} ] }`);
         })
       })
       .catch(err => {
@@ -269,12 +265,10 @@ function onConnection(ws: ownWebSocket, _req: any) {
       ws.send(`{ "Server": ["GG bhai", {"message" : "Successfully added the channel, await for information"} ] }`);
     } else if (message.Client[0] == "Handshake") {
       let kukoroData = readFileSync('./src/Resources/Kukoro.json', 'utf-8')
-      let settingsData = `{ "Server": [ "GG", { "message": ${kukoroData} } ] }`
-      ws.send(settingsData)
+      ws.send(`{ "Server": [ "GG", { "message": ${kukoroData} } ] }`)
     } else if (message.Client[0] == 'fetchData') {
       let kukoroData = readFileSync('./src/Resources/Kukoro.json', 'utf-8')
-      let settingsData = `{ "Server": [ "GG", { "message": ${kukoroData} } ] }`; 
-      ws.send(settingsData)
+      ws.send(`{ "Server": [ "GG", { "message": ${kukoroData} } ] }`)
 
       
     } else if (message.Client[0] == 'updateToggleData') {     
