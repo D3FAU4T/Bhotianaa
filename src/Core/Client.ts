@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { ChatUserstate, Client } from "tmi.js";
 import { promisify } from "util";
 import { remove } from "remove-accents";
-import { AnnounceColors, CommandsInterface, CommandsInterfaceDefault, LogErrorPath } from "../Typings/Core";
+import { AnnounceColors, CommandsInterface, LogErrorPath } from "../Typings/Core";
 import { GetChannel, GetGames, GetUser, StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
 import { DictionaryAPI, OxfordDictionaryAPI } from "../Typings/DictionaryAPI";
 
@@ -23,7 +23,7 @@ export class Bhotianaa extends Client {
 
     private BigWordActive: boolean;
     private BigWordMessageCount: number;
-    public CustomCommands: Map<string, CommandsInterfaceDefault>;
+    public CustomCommands: Map<string, CommandsInterface>;
 
     private static readonly TwitchHeaders = Bhotianaa.MakeHeader(false);
     private static readonly TwitchStreamerHeaders = Bhotianaa.MakeHeader(true);
@@ -88,7 +88,7 @@ export class Bhotianaa extends Client {
     }
 
     public async ImportFile<T>(filePath: string): Promise<T> {
-        return await require(filePath) as T;
+        return await require(filePath).default as T;
     }
 
     public async LoadCustomCommands(): Promise<void> {
@@ -96,7 +96,7 @@ export class Bhotianaa extends Client {
 
         CommandFiles.forEach(async FilePath => {
             const Command = await this.ImportFile<CommandsInterface>(FilePath);
-            this.CustomCommands.set(Command.default.Name, Command.default);
+            this.CustomCommands.set(Command.Name, Command);
         });
     }
 
@@ -174,7 +174,7 @@ export class Bhotianaa extends Client {
 
     public async GetUptime(ChannelName: string): Promise<string> {
         try {
-            const { data } = await axios.get<string>(`https://decapi.me/twitch/uptime?channel=${ChannelName}`);
+            const { data } = await axios.get<string>(`https://decapi.me/twitch/uptime?channel=${ChannelName.replace(/\#/g, '')}`);
             return data;
         } catch (err) {
             return 'An error occurred while executing this command'
