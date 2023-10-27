@@ -5,7 +5,6 @@ type RunOptions = {
   Channel: string;
   UserState: ChatUserstate;
   Message: string;
-  Self: boolean;
 }
 
 export interface CommandsInterface {

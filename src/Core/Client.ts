@@ -62,17 +62,14 @@ export class Bhotianaa extends Client {
     public async Start(): Promise<void> {
         await this.LoadCustomCommands().catch(console.error);
         await this.connect().catch(console.error);
-      
+
         this.on('message', (channel, userstate, message, self) => {
-            if (message.startsWith('/')) return;
+            if (self || message.startsWith('/')) return;
 
-            if (!self) {
-                if (this.BigWordActive) this.BigWordMessageCount++;
-
-                if (this.BigWordActive && this.BigWordMessageCount === 7) {
-                    this.say(channel, `Nerdge letters --> ${this.BigWord}`);
-                    this.BigWordMessageCount = 0;
-                }
+            if (this.BigWordActive) this.BigWordMessageCount++;
+            if (this.BigWordActive && this.BigWordMessageCount === 7) {
+                this.say(channel, `Nerdge letters --> ${this.BigWord}`);
+                this.BigWordMessageCount = 0;
             }
 
             // Commands Handler
@@ -80,10 +77,12 @@ export class Bhotianaa extends Client {
                 const [CommandName, ...CommandArgs] = message.split(' ');
                 const Command = this.CustomCommands.get(CommandName.slice(1).toLowerCase());
 
-                if (Command) Command.Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
+                if (Command) Command.Run({ Channel: channel, Message: message, UserState: userstate }, this);
             }
 
-            else if (message === ']') this.CustomCommands.get(']')?.Run({ Channel: channel, Message: message, Self: self, UserState: userstate }, this);
+            else if (message === ']') this.CustomCommands.get(']')?.Run({ Channel: channel, Message: message, UserState: userstate }, this);
+
+            if (message.endsWith('-')) this.say(channel, message.slice(0, -1));
         });
     }
 
