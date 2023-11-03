@@ -1,216 +1,241 @@
-import { readFileSync, writeFileSync } from 'fs';
+import WebSocket from 'ws';
+import { IncomingMessage } from 'http';
 import { ChatUserstate } from 'tmi.js';
+import { Bhotianaa } from '../Core/Client';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { GameTypes, KukoroData, kukoroData } from '../Typings/Kukoro';
 
-export interface kukoroData {
-  kukoroModuleToggle: boolean,
-  kukoro: {
-    dungeon: {
-      active: boolean,
-      types: string[],
-      categories: {
-        [key: string]: string[],
-      }
-    },
-    sniper: {
-      active: boolean,
-      followMode: boolean,
-      follower: string
-    },
-    oneTwoThree: {
-      active: boolean,
-      status: string
+export class Kukoro {
+
+    public Bot: Bhotianaa;
+    public Database: KukoroData;
+    public TwitchChannel: string;
+    private Websocket: WebSocket.Server<typeof WebSocket, typeof IncomingMessage>;
+    private static DatabasePath = "./src/Config/Kukoro.json";
+
+    constructor(Bot: Bhotianaa, Websocket: WebSocket.Server<typeof WebSocket, typeof IncomingMessage>) {
+        this.Bot = Bot;
+        this.Websocket = Websocket;
+        this.TwitchChannel = '#gianaa_';
+        this.Database = this.LoadAndVerifyFiles();
+        this.Bot.on('message', this.DungeonCommandHandler.bind(this));
+        this.Bot.on('message', this.OtherKukoroCommandsHandler.bind(this));
     }
-  }
-}
 
-export interface messageHandler {
-  messages: string[],
-  websocket: kukoroData
-}
+    public ResetDatabase(Games: GameTypes[]): KukoroData {
+        for (const category of Games) {
+            if (category === 'Sniper') {
+                this.Database.Kukoro.Sniper.Active = false;
+                this.Database.Kukoro.Sniper.FollowMode = false;
+                this.Database.Kukoro.Sniper.Follower = 'Yo Mamma'
+            } else if (category === 'OneTwoThree') {
+                this.Database.Kukoro.OneTwoThree.Active = false;
+                this.Database.Kukoro.OneTwoThree.Status = "none";
+            }
+            else if (category === 'Dungeon') {
+                this.Database.Kukoro.Dungeon.Active = false;
+                Object.keys(this.Database.Kukoro.Dungeon.Categories).forEach(element => this.Database.Kukoro.Dungeon.Categories[element] = []);
+            }
+        }
 
-let resources: kukoroData = JSON.parse(readFileSync("./src/Resources/Kukoro.json", 'utf-8'));
-
-// with exclamation
-// It works like a twitch message handler, except it returns message with settings
-export async function messageHandlerExclamation(channel: string, userstate: ChatUserstate, message: string, self: boolean): Promise<messageHandler | undefined> {
-  if (self || !message.startsWith("!") || message.includes('-') || message.startsWith('/')) return;
-  const args = message.toLowerCase().replaceAll("@", "").slice(1).split(' ');
-  const command = args.shift();
-
-  let isMod = userstate.mod || userstate['user-type'] === 'mod';
-  let isBroadcaster = channel.slice(1) === userstate.username;
-  let isModUp = isMod || isBroadcaster;
-
-  if (command == 'follow' && resources.kukoro.sniper.active == true) {
-    resources.kukoro.sniper.followMode = true;
-    resources.kukoro.sniper.follower = args[0].toLowerCase();
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    return { "messages": [`I'm now following ${args[0]}`], "websocket": resources }
-  }
-
-  else if (command == 'rickrolled' && resources.kukoro.dungeon.active === true) {
-    resources = reset(['sniper', 'oneTwoThree', 'dungeon'])
-    return { "messages": [`All categories reseted`], "websocket": resources }
-  }
-
-  else if (command == 'newcategory' && isModUp) {
-    resources.kukoro.dungeon.categories[args[0]] = [];
-    resources.kukoro.dungeon.types.push(args[0])
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    if (userstate.username == 'gianaa_') return { "messages": [`Mamma, I made a new cateogry: ${args[0]}`], "websocket": resources }
-    else if (userstate.username == 'd3fau4t') return { "messages": [`Papa Papa, look we have a new enemy: ${args[0]}`], "websocket": resources }
-    else return { "messages": [`Added new category: ${args[0]}`], "websocket": resources }
-  }
-
-  else if (command == 'join') {
-    if (args[0] == 'dungeon') {
-      resources = reset(['sniper', 'oneTwoThree'])
-      resources.kukoro.dungeon.active = true;
-      // console.log('LOG JOIN DUNGEON: ', resources)
-      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-      return { "messages": ["!kukoro", "!w !kukoro"], "websocket": resources }
+        this.SaveChanges();
+        return this.Database;
     }
-    else if (args[0] == 'sniper') {
-      resources = reset(['dungeon', 'oneTwoThree'])
-      resources.kukoro.sniper.active = true;
-      resources.kukoro.sniper.followMode = true;
-      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-      return { "messages": ["!kukoro", "!w !kukoro"], "websocket": resources }
+
+    private LoadAndVerifyFiles(): KukoroData {
+        Kukoro.FileCheckerAndCreator(Kukoro.DatabasePath, JSON.stringify(kukoroData, null, 4));
+        return JSON.parse(readFileSync(Kukoro.DatabasePath, 'utf-8')) as KukoroData;
     }
-    else if (args[0] == '123') {
-      resources = reset(['dungeon', 'sniper'])
-      resources.kukoro.oneTwoThree.active = true;
-      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-      return { "messages": ["!kukoro"], "websocket": resources }
+
+    public SaveChanges(Data?: KukoroData): void {
+        writeFileSync(Kukoro.DatabasePath, JSON.stringify(Data || this.Database, null, 4));
     }
-  }
-  else if (command == 'reset') {
-    resources = reset(['oneTwoThree', 'sniper', 'dungeon'])
-    return { "messages": [`All settings resetted.`], "websocket": resources }
-  }
-  else if (command == 'followon') {
-    resources.kukoro.sniper.followMode = true;
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    return { "messages": [`Follow mode turned on. I'm following ${resources.kukoro.sniper.follower}!`], "websocket": resources }
-  }
 
-  else if (command == 'followoff') {
-    resources.kukoro.sniper.followMode = false;
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    return { "messages": [`Follow mode turned off.`], "websocket": resources }
-  }
-
-  else if (command == 'hidebots') return { "messages": ["!hide", "!w !hide"], "websocket": resources }
-
-  else if (command == 'ability' && resources.kukoro.dungeon.active == true) {
-    if (typeof (resources.kukoro.dungeon.categories[args[0]]) == 'undefined') return;
-    if (args[1]) {
-      if (resources.kukoro.dungeon.categories[args[0]].includes(args[1])) return { "messages": [`Uncle ${args[1]} is already in the category ${args[0]}`], "websocket": resources }
-      resources.kukoro.dungeon.categories[args[0]].push(args[1])
-      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-      return { "messages": [`Uncle ${args[1]} added to the ${args[0]} category`], "websocket": resources }
-    } else {
-      if (typeof(userstate.username) === 'undefined') return;
-      if (resources.kukoro.dungeon.categories[args[0]].includes(userstate.username)) return { "messages": [`Uncle ${userstate.username}, you're already in the category ${args[0]}`], "websocket": resources }
-      resources.kukoro.dungeon.categories[args[0]].push(userstate.username)
-      writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-      return { "messages": [`Uncle ${userstate.username} added to the ${args[0]} category`], "websocket": resources }
+    public AnnounceAndSendSocket(data: KukoroData, messages?: string | string[]): void {
+        this.Websocket.clients.forEach((client) => client.send(`{ "Server": [ "GG", { "message": ${JSON.stringify(data)} } ] }`));
+        if (typeof messages === 'string') this.Bot.say(this.TwitchChannel, messages);
+        else if (typeof messages === 'object') for (const message of messages) this.Bot.say(this.TwitchChannel, message);
     }
-  }
-  else if (command == 'categories') return { "messages": [`${resources.kukoro.dungeon.types.join(', ')}`], "websocket": resources }
-  else if (typeof (command) != 'undefined' && resources.kukoro.dungeon.categories[command] && resources.kukoro.dungeon.active == true) {
-    if (resources.kukoro.dungeon.categories[command].length == 0) return { "messages": [`The category ${command} is empty right now.`], "websocket": resources }
-    return { "messages": [resources.kukoro.dungeon.categories[command].join(', ')], "websocket": resources }
-  }
 
-  else if (command == 'botsinfo' && resources.kukoro.dungeon.active == true) return { "messages": ["!getinfo", "!getinfo @streamlabs"], "websocket": resources }
+    private static FileCheckerAndCreator(FilePath: string, FileBody: string | NodeJS.ArrayBufferView, Overwrite?: boolean): boolean {
+        if (Overwrite === undefined) Overwrite = false;
+        if (FilePath.startsWith('./')) FilePath = FilePath.slice(2);
+        const PathArray = FilePath.split('/');
+        let Path = './';
+        let modified = false;
+        for (const DirOrFile of PathArray) {
+            Path += DirOrFile + '/';
+            if (DirOrFile.includes('.')) {
+                if (!existsSync(Path)) { writeFileSync(Path, FileBody); modified = true; }
+                else {
+                    if (Overwrite) {
+                        writeFileSync(Path, FileBody);
+                        modified = true;
+                    }
+                }
+            } else {
+                if (!existsSync(Path)) { mkdirSync(Path); modified = true; }
+                else {
+                    if (Overwrite) {
+                        writeFileSync(Path, FileBody);
+                        modified = true;
+                    }
+                }
+            }
+        }
 
-  else return undefined
-}
-
-export async function messageHandlerWithoutExclamation(_channel: string, userstate: ChatUserstate, message: string, self: boolean): Promise<messageHandler | undefined> {
-
-  if (resources.kukoro.sniper.active == true && resources.kukoro.sniper.followMode == true && userstate.username == resources.kukoro.sniper.follower) {
-    if (message.toLowerCase() == '!kukoro') return;
-    if (message.toLowerCase() == "!club") return { "messages": ["!club"], "websocket": resources }
-    if (message.toLowerCase() == "!park") return { "messages": ["!park"], "websocket": resources }
-    if (message.toLowerCase() == "!plaza") return { "messages": ["!plaza"], "websocket": resources }
-    if (message.toLowerCase() == "!dock") return { "messages": ["!dock"], "websocket": resources }
-  }
-
-  if (self || message.startsWith("/") || message.includes("-") || message.toLowerCase().startsWith("!w") || userstate.username != 'gianaa_') return;
-
-  if (resources.kukoro.oneTwoThree.active == true && message.includes('[KUKORO] <<< YOU CAN MOVE! >>>')) {
-    resources.kukoro.oneTwoThree.status = "Walking";
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    return { "messages": ["!go"], "websocket": resources }
-  }
-  else if (resources.kukoro.oneTwoThree.active == true && message.includes('[KUKORO] <<< STOP! >>>')) {
-    resources.kukoro.oneTwoThree.status = "Halted";
-    writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-    return { "messages": ["!stop"], "websocket": resources }
-  }
-  else if (message.includes('[KUKORO] RAID IS OVER >>>')) {
-    resources = reset(['dungeon'])
-    return { "messages": [`All categories reseted`], "websocket": resources }
-  }
-  else if (message.includes("[KUKORO] GAME OVER >>>")) {
-    resources = reset(['sniper', 'oneTwoThree', 'dungeon'])
-    return { "messages": [`Settings reseted`], "websocket": resources }
-  }
-  else if (message.includes("[KUKORO] New objective") && message.toLowerCase().includes('sniper')) {
-    let partMsg = message.split(' ');
-
-    partMsg.forEach(part => {
-      if (part === part.toUpperCase()) {
-        if (part.includes('/') || part.includes('[') || part == 'DNA') return;
-        resources.kukoro.sniper.follower = part.replaceAll('.', '').toLowerCase();
-        writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-        return { "messages": [`I'm now following ${resources.kukoro.sniper.follower}`], "websocket": resources }
-      }
-    });
-
-    partMsg.forEach(word => {
-      if (word.includes("’")) {
-        resources.kukoro.sniper.follower = word.toLowerCase().slice(0, -2)
-        writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-        return { "messages": [`I'm now following ${resources.kukoro.sniper.follower}`], "websocket": resources }
-      }
-    });
-  }
-  else return undefined;
-
-}
-
-export function reset(game: string[]): kukoroData {
-  let resources: kukoroData = JSON.parse(readFileSync("./src/Resources/Kukoro.json", 'utf-8'))
-  game.forEach(category => {
-    if (category == 'sniper') {
-      resources.kukoro.sniper.active = false;
-      resources.kukoro.sniper.followMode = false;
-      resources.kukoro.sniper.follower = 'Yo Mamma'
-    } else if (category == 'oneTwoThree') {
-      resources.kukoro.oneTwoThree.active = false;
-      resources.kukoro.oneTwoThree.status = "none";
+        return modified;
     }
-    else if (category == 'dungeon') {
-      resources.kukoro.dungeon.active = false;
-      Object.keys(resources.kukoro.dungeon.categories).forEach(element => resources.kukoro.dungeon.categories[element] = []);
-    }
-  })
-  writeFileSync("./src/Resources/Kukoro.json", JSON.stringify(resources, null, 2))
-  return resources;
-}
 
-function ToTitleCase(str: string): string {
-  return str.replace(/\S+/g,
-    function (txt) { return txt[0].toUpperCase() + txt.substring(1).toLowerCase(); });
+    private DungeonCommandHandler(Channel: string, UserState: ChatUserstate, Message: string, Self: boolean): void {
+        if (this.Database.KukoroModuleToggle === false || Self || !Message.startsWith("!") || Message.includes('-') || Message.startsWith('/')) return;
+        this.TwitchChannel = Channel;
+        const args = Message.toLowerCase().replace(/\@/g, "").slice(1).split(' ');
+        const command = args.shift();
+
+        let isMod = UserState.mod || UserState['user-type'] === 'mod';
+        let isBroadcaster = Channel.slice(1) === UserState.username;
+        let isModUp = isMod || isBroadcaster;
+
+        if (command == 'follow' && this.Database.Kukoro.Sniper.Active == true) {
+            this.Database.Kukoro.Sniper.FollowMode = true;
+            this.Database.Kukoro.Sniper.Follower = args[0].toLowerCase();
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, `I'm now following ${args[0]}`);
+        }
+
+        else if (command == 'rickrolled' && this.Database.Kukoro.Dungeon.Active === true) {
+            this.Database = this.ResetDatabase(['Dungeon', 'Sniper', 'OneTwoThree']);
+            this.AnnounceAndSendSocket(this.Database, `All categories are reset.`);
+        }
+
+        else if (command == 'newcategory' && isModUp) {
+            this.Database.Kukoro.Dungeon.Categories[args[0]] = [];
+            this.SaveChanges();
+            if (UserState.username == 'gianaa_') this.Bot.say(Channel, `Mamma, I made a new cateogry: ${args[0]}`);
+            else if (UserState.username == 'd3fau4t') this.Bot.say(Channel, `Papa Papa, look we have a new enemy: ${args[0]}`);
+            else this.Bot.say(Channel, `Added new category: ${args[0]}`);
+            this.AnnounceAndSendSocket(this.Database);
+        }
+
+        else if (command == 'join') {
+            if (args[0] == 'dungeon') {
+                this.Database = this.ResetDatabase(['Sniper', 'OneTwoThree']);
+                this.Database.Kukoro.Dungeon.Active = true;
+                // console.log('LOG JOIN DUNGEON: ', resources)
+                this.SaveChanges();
+                this.AnnounceAndSendSocket(this.Database, ["!kukoro", "!w !kukoro"]);
+            }
+            else if (args[0] == 'sniper') {
+                this.Database = this.ResetDatabase(['Dungeon', 'OneTwoThree']);
+                this.Database.Kukoro.Sniper.Active = true;
+                this.Database.Kukoro.Sniper.FollowMode = true;
+                this.SaveChanges();
+                this.AnnounceAndSendSocket(this.Database, ["!kukoro", "!w !kukoro"]);
+            }
+            else if (args[0] == '123') {
+                this.Database = this.ResetDatabase(['Dungeon', 'Sniper']);
+                this.Database.Kukoro.OneTwoThree.Active = true;
+                this.SaveChanges();
+                this.AnnounceAndSendSocket(this.Database, "!kukoro");
+            }
+        }
+        else if (command == 'reset') {
+            this.Database = this.ResetDatabase(['Dungeon', 'Sniper', 'OneTwoThree']);
+            this.AnnounceAndSendSocket(this.Database, "All categories are reset.");
+        }
+        else if (command == 'followon') {
+            this.Database.Kukoro.Sniper.FollowMode = true;
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, `Follow mode turned on. I'm now following ${this.Database.Kukoro.Sniper.Follower}!`);
+        }
+
+        else if (command == 'followoff') {
+            this.Database.Kukoro.Sniper.FollowMode = false;
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, `Follow mode turned off.`);
+        }
+
+        else if (command == 'hidebots') {
+            this.AnnounceAndSendSocket(this.Database, ["!hide", "!w !hide"]);
+        }
+
+        else if (command == 'ability' && this.Database.Kukoro.Dungeon.Active) {
+            if (typeof (this.Database.Kukoro.Dungeon.Categories[args[0]]) == 'undefined') return;
+            if (args[1]) {
+                if (this.Database.Kukoro.Dungeon.Categories[args[0]].includes(args[1])) return this.AnnounceAndSendSocket(this.Database, `Uncle ${args[1]} is already in the category ${args[0]}`);
+                this.Database.Kukoro.Dungeon.Categories[args[0]].push(args[1]);
+                this.SaveChanges();
+                this.AnnounceAndSendSocket(this.Database, `Uncle ${args[1]} added to the ${args[0]} category`);
+            } else {
+                if (typeof (UserState.username) === 'undefined') return;
+                if (this.Database.Kukoro.Dungeon.Categories[args[0]].includes(UserState.username)) return this.AnnounceAndSendSocket(this.Database, `Uncle ${UserState.username}, you're already in the category ${args[0]}`);
+                this.Database.Kukoro.Dungeon.Categories[args[0]].push(UserState.username);
+                this.SaveChanges();
+                this.AnnounceAndSendSocket(this.Database, `Uncle ${UserState.username} added to the ${args[0]} category`);
+            }
+        }
+        else if (command == 'categories') {
+            let categories = Object.keys(this.Database.Kukoro.Dungeon.Categories).join(', ');
+            this.AnnounceAndSendSocket(this.Database, `Categories: ${categories}`);
+        }
+        else if (typeof (command) != 'undefined' && this.Database.Kukoro.Dungeon.Categories[command] && this.Database.Kukoro.Dungeon.Active) {
+            if (this.Database.Kukoro.Dungeon.Categories[command].length == 0) this.AnnounceAndSendSocket(this.Database, `The category ${command} is empty right now.`);
+            else this.AnnounceAndSendSocket(this.Database, `The category ${command} has ${this.Database.Kukoro.Dungeon.Categories[command].length} members: ${this.Database.Kukoro.Dungeon.Categories[command].join(', ')}`);
+        }
+
+        else if (command == 'botsinfo' && this.Database.Kukoro.Dungeon.Active) this.AnnounceAndSendSocket(this.Database, ["!getinfo", "!getinfo @streamlabs"]);
+
+        else return undefined
+    }
+
+    private OtherKukoroCommandsHandler(_Channel: string, UserState: ChatUserstate, Message: string, Self: boolean): void {
+        if (this.Database.KukoroModuleToggle === false) return;
+        if (this.Database.Kukoro.Sniper.Active && this.Database.Kukoro.Sniper.FollowMode && UserState.username == this.Database.Kukoro.Sniper.Follower) {
+            if (Message.toLowerCase() == '!kukoro') return;
+            else if (Message.toLowerCase() == "!club") this.AnnounceAndSendSocket(this.Database, "!club");
+            else if (Message.toLowerCase() == "!park") this.AnnounceAndSendSocket(this.Database, "!park");
+            else if (Message.toLowerCase() == "!plaza") this.AnnounceAndSendSocket(this.Database, "!plaza");
+            else if (Message.toLowerCase() == "!dock") this.AnnounceAndSendSocket(this.Database, "!dock");
+        }
+    
+        if (Self || Message.startsWith("/") || Message.includes("-") || Message.toLowerCase().startsWith("!w") || UserState.username != 'gianaa_') return;
+    
+        if (this.Database.Kukoro.OneTwoThree.Active && Message.includes('[KUKORO] <<< YOU CAN MOVE! >>>')) {
+            this.Database.Kukoro.OneTwoThree.Status = "Walking";
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, "!go");
+        }
+        else if (this.Database.Kukoro.OneTwoThree.Active && Message.includes('[KUKORO] <<< STOP! >>>')) {
+            this.Database.Kukoro.OneTwoThree.Status = "Halted";
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, "!stop");
+        }
+        else if (Message.includes('[KUKORO] RAID IS OVER >>>')) {
+            this.Database = this.ResetDatabase(['Dungeon']);
+            this.AnnounceAndSendSocket(this.Database, "All categories are now reset.");
+        }
+        else if (Message.includes("[KUKORO] GAME OVER >>>")) {
+            this.Database = this.ResetDatabase(['Dungeon', 'Sniper', 'OneTwoThree']);
+            this.AnnounceAndSendSocket(this.Database, "All categories are now reset.");
+        }
+        else if (Message.includes("[KUKORO] New objective") && Message.toLowerCase().includes('Sniper')) {
+            const matches = Message.match(/\b([A-Z_0-9]+)’s\b/g);
+            if (matches) matches.length > 1 ? this.Database.Kukoro.Sniper.Follower = matches[1].slice(0, -2).toLowerCase() : this.Database.Kukoro.Sniper.Follower = matches[0].slice(0, -2).toLowerCase();
+            const matches1 = Message.match(/([A-Z_0-9]+)\./g);
+            if (matches1) matches1.length > 1 ? this.Database.Kukoro.Sniper.Follower = matches1[1].slice(0, -1).toLowerCase() : this.Database.Kukoro.Sniper.Follower = matches1[0].slice(0, -1).toLowerCase();
+            this.SaveChanges();
+            this.AnnounceAndSendSocket(this.Database, `I'm now following ${this.Database.Kukoro.Sniper.Follower}`);
+        }
+
+        else return undefined;
+    }
 }
 
 //[KUKORO] STREAMLABS (Lv. 13, Crit. 16%, Dodge 11%) > [You will run away from combat if you get under 25% hp in front of any boss] and [Level +2 all your team if you die by any boss].
-//[KUKORO] New objective #1/3: The sniper is tracking radiation particles on SPECTRODANNY71’s clothing.
+//[KUKORO] New objective #1/3: The Sniper is tracking radiation particles on SPECTRODANNY71’s clothing.
 //[KUKORO] RAID IS OVER >>> NOTSOCLEAR and STREAMLABS leveled up for the next raid.
-//[KUKORO] New objective #1/3: The sniper is tracking radiation particles on MATANXD1’s clothing.
-// [KUKORO] New objective #2/3: The sniper is analyzing DNA to find PRATEEK_N.
+//[KUKORO] New objective #1/3: The Sniper is tracking radiation particles on MATANXD1’s clothing.
+// [KUKORO] New objective #2/3: The Sniper is analyzing DNA to find PRATEEK_N.
 // PARK PLAZA PARK DOCK
 // [KUKORO] GAME OVER >>> 

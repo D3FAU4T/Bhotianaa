@@ -13,6 +13,7 @@ export interface ServerPing {
 };
 
 export type ServerEventNames = "Hai bhai" | "GG bhai" | "GG" | "console";
+type ClientEventNames = "Ola bhai" | "Handshake" | "fetchData" | "updateToggleData" | "sendMessageAsBot";
 
 interface ServerMessageFormat {
     Server: [
@@ -23,8 +24,8 @@ interface ServerMessageFormat {
 
 export interface ClientMessageFormat {
     Client: [
-        "Ola bhai",
-        { channel: string }
+        ClientEventNames,
+        { channel: string; message?: string }
     ]
 }
 
