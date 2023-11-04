@@ -64,7 +64,7 @@ export class Kukoro {
         let Path = './';
         let modified = false;
         for (const DirOrFile of PathArray) {
-            Path += DirOrFile + '/';
+            Path += DirOrFile + DirOrFile.includes('.') ? '' : '/';
             if (DirOrFile.includes('.')) {
                 if (!existsSync(Path)) { writeFileSync(Path, FileBody); modified = true; }
                 else {

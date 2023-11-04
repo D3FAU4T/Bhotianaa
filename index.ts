@@ -90,11 +90,11 @@ wss.on('connection', (ws: CustomWebSocket) => {
             ws.send(`{ "Server": [ "GG", { "message": ${kukoroData} } ] }`)
         } else if ('Client' in message && message.Client[0] == 'updateToggleData') {
             let kukoroData = JSON.parse(readFileSync(kukoroPath, 'utf-8'));
-            if (message.Client[1].message == 'true') kukoroData.kukoroModuleToggle = true
-            else kukoroData.kukoroModuleToggle = false;
+            if (message.Client[1].message == 'true') kukoroData.KukoroModuleToggle = true
+            else kukoroData.KukoroModuleToggle = false;
             writeFileSync(kukoroPath, JSON.stringify(kukoroData, null, 2));
             let mode; // Could be this undefined Better log on client side O_o
-            if (kukoroData.kukoroModuleToggle == true) mode = "Kukoro Module turned on"
+            if (kukoroData.KukoroModuleToggle == true) mode = "Kukoro Module turned on"
             else {
                 mode = "Kukoro Module turned off";
                 kukoro.ResetDatabase(['OneTwoThree', 'Dungeon', 'Sniper'])

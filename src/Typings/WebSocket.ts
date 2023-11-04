@@ -12,7 +12,7 @@ export interface ServerPing {
     Ping: "Kya tum yahaan pe ho bhai?"
 };
 
-export type ServerEventNames = "Hai bhai" | "GG bhai" | "GG" | "console";
+export type ServerEventNames = "Hai bhai" | "GG bhai" | "Mostrar bhai" | "GG" | "console";
 type ClientEventNames = "Ola bhai" | "Handshake" | "fetchData" | "updateToggleData" | "sendMessageAsBot";
 
 interface ServerMessageFormat {

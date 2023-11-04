@@ -48,7 +48,7 @@ export class Bhotianaa extends Client {
         this.BigWordMessageCount = 0;
         this.CustomCommands = new Map();
 
-        this.TemporaryLink = (JSON.parse(readFileSync('./src/Resources/Links.json', 'utf-8')) as { Link: string; }).Link;
+        this.TemporaryLink = (JSON.parse(readFileSync('./src/Config/Links.json', 'utf-8')) as { Link: string; }).Link;
     }
 
     private static MakeHeader(StreamerMode: boolean) {
