@@ -1,5 +1,7 @@
+import WebSocket from "ws";
 import { ChatUserstate } from "tmi.js";
 import { Bhotianaa } from "../Core/Client";
+import { IncomingMessage } from "http";
 
 type RunOptions = {
   Channel: string;
@@ -22,3 +24,7 @@ export interface CommandsInterfaceDefault {
 export type AnnounceColors = 'blue' | 'green' | 'orange' | 'purple' | 'primary'
 
 export const LogErrorPath = './src/Logs/Error.log';
+
+export interface BotOptions {
+  WebSocket: WebSocket.Server<typeof WebSocket, typeof IncomingMessage> | null
+}

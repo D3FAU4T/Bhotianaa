@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync } from "fs";
 import { ChatUserstate, Client } from "tmi.js";
 import { promisify } from "util";
 import { remove } from "remove-accents";
-import { AnnounceColors, CommandsInterface, LogErrorPath } from "../Typings/Core";
+import { AnnounceColors, CommandsInterface, LogErrorPath, BotOptions } from "../Typings/Core";
 import { GetChannel, GetGames, GetUser, StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
 import { DictionaryAPI, OxfordDictionaryAPI } from "../Typings/DictionaryAPI";
 
@@ -20,10 +20,11 @@ export class Bhotianaa extends Client {
 
     public BigWord: string | null;
     public TemporaryLink: string | null;
+    public CustomCommands: Map<string, CommandsInterface>;
+    public BotOptions: BotOptions;
 
     private BigWordActive: boolean;
     private BigWordMessageCount: number;
-    public CustomCommands: Map<string, CommandsInterface>;
 
     private static readonly TwitchHeaders = Bhotianaa.MakeHeader(false);
     private static readonly TwitchStreamerHeaders = Bhotianaa.MakeHeader(true);
@@ -32,7 +33,7 @@ export class Bhotianaa extends Client {
         'app_key': process.env['OD_KEY']
     };
 
-    constructor(ChannelName: string) {
+    constructor(ChannelName: string, Options?: BotOptions) {
         super({
             options: { clientId: process.env['clientId'], debug: true },
             connection: { reconnect: true },
@@ -47,8 +48,10 @@ export class Bhotianaa extends Client {
         this.BigWordActive = false;
         this.BigWordMessageCount = 0;
         this.CustomCommands = new Map();
-
         this.TemporaryLink = (JSON.parse(readFileSync('./src/Config/Links.json', 'utf-8')) as { Link: string; }).Link;
+        this.BotOptions = Options || {
+            WebSocket: null
+        };
     }
 
     private static MakeHeader(StreamerMode: boolean) {

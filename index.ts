@@ -8,7 +8,6 @@ import { readFileSync, writeFileSync } from 'fs';
 import { KukoroData } from './src/Typings/Kukoro';
 
 const app = express();
-const client = new Bhotianaa("gianaa_");
 
 app.set('views', './src/views');
 app.set('view engine', 'pug');
@@ -29,6 +28,10 @@ app.post("/message", (req, res) => {
 
 const botServer = app.listen(3000);
 const wss = new WebSocket.Server({ server: botServer });
+const client = new Bhotianaa("gianaa_", {
+    WebSocket: wss
+});
+
 const kukoroPath = './src/Config/Kukoro.json';
 const kukoro = new Kukoro(client, wss);
 
