@@ -1,0 +1,17 @@
+{
+    "broadcaster": [
+        "channel:bot",
+        "channel:manage:broadcast",
+        "channel:read:hype_train",
+        "channel:read:polls",
+        "channel:read:predictions",
+        "moderator:manage:announcements",
+        "moderator:read:shoutouts",
+        "moderator:manage:shoutouts"
+    ],
+    "app": [
+        "user:bot",
+        "chat:read",
+        "chat:edit"
+    ]
+}

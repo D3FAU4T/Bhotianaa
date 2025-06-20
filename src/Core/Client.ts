@@ -1,21 +1,4 @@
-import glob from "glob";
-import axios, { AxiosError } from "axios";
-import { appendFileSync, readFileSync } from "fs";
-import { ChatUserstate, Client } from "tmi.js";
-import { promisify } from "util";
-import { remove } from "remove-accents";
-import { AnnounceColors, CommandsInterface, LogErrorPath, BotOptions } from "../Typings/Core";
-import { GetChannel, GetGames, GetUser, StreamGoodClips, StreamGoodClipsError, TwitchAPIStandardError } from "../Typings/TwitchAPI";
-import { DictionaryAPI, OxfordDictionaryAPI } from "../Typings/DictionaryAPI";
-
-const globPromise = promisify(glob);
-
-export class Command {
-    constructor(Options: CommandsInterface) {
-        Object.assign(this, Options);
-    }
-}
-
+import { Client } from 'tmi.js';
 export class Bhotianaa extends Client {
 
     public BigWord: string | null;

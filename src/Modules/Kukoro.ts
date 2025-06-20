@@ -1,4 +1,3 @@
-import WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 import { ChatUserstate } from 'tmi.js';
 import { Bhotianaa } from '../Core/Client';

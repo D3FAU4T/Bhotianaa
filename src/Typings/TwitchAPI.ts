@@ -70,3 +70,11 @@ export interface StreamGoodClipsError {
         location: string;
     }[]
 }
+
+export interface TwitchAuth {
+  access_token: string;
+  expires_in: number;
+  refresh_token: string;
+  scope: string[];
+  token_type: "bearer"
+}

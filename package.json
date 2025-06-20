@@ -1,30 +1,20 @@
 {
   "name": "bhotianaa",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
   "scripts": {
-    "test": "node ./src/Tests/test.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.4.0",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "glob": "^7.2.0",
-    "pug": "^3.0.2",
-    "remove-accents": "^0.4.4",
-    "tmi.js": "^1.8.5",
-    "ws": "^8.13.0"
+    "dev": "NODE_ENV=development bun run index.ts",
+    "start": "NODE_ENV=production bun run index.ts"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.13",
-    "@types/express": "^4.17.17",
-    "@types/glob": "^7.2.0",
-    "@types/node": "^18.16.18",
-    "@types/tmi.js": "^1.8.3",
-    "@types/ws": "^8.5.5"
+    "@types/bun": "latest",
+    "@types/tmi.js": "^1.8.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "tmi.js": "^1.8.5"
   }
 }

@@ -1,118 +1,183 @@
-import cors from 'cors';
-import express from 'express';
-import WebSocket from 'ws';
-import { Bhotianaa } from "./src/Core/Client";
-import { ClientMessageFormat, ClientPong, CustomWebSocket, ServerEventNames } from './src/Typings/WebSocket';
-import { Kukoro } from './src/Modules/Kukoro';
-import { readFileSync, writeFileSync } from 'fs';
-import { KukoroData } from './src/Typings/Kukoro';
+import { CSRF } from 'bun';
+import { Client } from 'tmi.js';
+import type { TwitchAuth } from './src/Typings/TwitchAPI';
+import type { Scopes } from './src/Typings/Bhotianaa';
 
-const app = express();
+const tokenFile = Bun.file('./src/Config/tokens.json');
 
-app.set('views', './src/views');
-app.set('view engine', 'pug');
-app.use(express.json());
-app.use(cors());
-app.get('/:channel/shoutout', (_req, res) => res.render('shoutout'));
+const server = Bun.serve({
+    port: Bun.env.PORT,
+    development: Bun.env.NODE_ENV === 'development',
+    routes: {
+        '/': () => new Response('Hello World!'),
+        '/auth/:authtype': async (req: Bun.BunRequest<'/auth/:authtype'>) => {
+            const { authtype } = req.params;
 
-app.get('/', (_req, res) => {
-    res.send('Hello World!');
-});
+            if (authtype !== 'app' && authtype !== 'broadcaster')
+                return new Response(`Invalid auth type. Use "app" or "broadcaster" after 'http://localhost:${Bun.env.PORT}/auth/'.`, { status: 400 });
 
-app.post("/message", (req, res) => {
-    client.say(req.body.channel, req.body.message);
-    res.send({
-        "message": "Message sent to channel successfully"
-    });
-});
+            const scopes: Scopes = await Bun.file(process.cwd() + `/src/Config/scopes.json`).json();
+            const expiresInMs = 1000 * 60 * 20; // 20 minutes
+            const state = CSRF.generate(Bun.env.CSRF_SECRET, {
+                expiresIn: expiresInMs
+            });
 
-const botServer = app.listen(3000);
-const wss = new WebSocket.Server({ server: botServer });
-const client = new Bhotianaa("gianaa_", {
-    WebSocket: wss
-});
+            const expires = new Date(Date.now() + expiresInMs).toUTCString();
 
-const kukoroPath = './src/Config/Kukoro.json';
-const kukoro = new Kukoro(client, wss);
+            return Response.redirect(`${Bun.env.TWITCH_AUTH_URL}?client_id=${Bun.env.TWITCH_CLIENT_ID}&redirect_uri=http://localhost:${Bun.env.PORT}/auth/callback&response_type=code&scope=${encodeURIComponent(scopes[authtype].join(' '))}&state=${state}`, {
+                headers: {
+                    "Set-Cookie": `csrf=${state}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}, auth_type=${authtype}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`,
+                }
+            });
+        },
+        '/auth/callback': async (req: Bun.BunRequest<'/auth/callback'>) => {
+            const url = new URL(req.url);
 
-app.get('/kukoro', (_req, res) => {
-    res.send(JSON.parse(readFileSync(kukoroPath, 'utf-8')));
-})
+            const authType = req.cookies.get('auth_type') as 'app' | 'broadcaster';
 
-app.post('/game', (req, res) => {
-    let data: KukoroData = JSON.parse(readFileSync(kukoroPath, 'utf-8'));
-    let game: string = req.body.game;
-    let returningData: KukoroData;;
-    if (game == 'Dungeon') {
-        data.KukoroModuleToggle = true;
-        data.Kukoro.Dungeon.Active = true;
-        kukoro.SaveChanges(data);
-        returningData = kukoro.ResetDatabase(['Sniper', 'OneTwoThree']);
-        kukoro.AnnounceAndSendSocket(returningData, ['!kukoro', '!w !kukoro']);
-    } else if (game == 'Sniper') {
-        data.KukoroModuleToggle = true;
-        data.Kukoro.Sniper.Active = true;
-        data.Kukoro.Sniper.FollowMode = true;
-        kukoro.SaveChanges(data);
-        returningData = kukoro.ResetDatabase(['OneTwoThree', 'Dungeon']);
-        kukoro.AnnounceAndSendSocket(returningData, '!kukoro');
-    } else if (game == 'OneTwoThree') {
-        data.Kukoro.OneTwoThree.Active = true;
-        kukoro.SaveChanges(data);
-        returningData = kukoro.ResetDatabase(['Dungeon', 'Sniper']);
-        kukoro.AnnounceAndSendSocket(returningData, '!kukoro');
-    } else if (game == 'idle') {
-        returningData = kukoro.ResetDatabase(['Dungeon', 'Sniper', 'OneTwoThree']);
-        kukoro.AnnounceAndSendSocket(returningData, "All settings are now reset!");
-    }
-    res.send("Game changed successfully")
-});
+            // Security checks
+            const state = url.searchParams.get('state');
+            const csrfCookie = req.cookies.get('csrf');
 
-wss.on('connection', (ws: CustomWebSocket) => {
-    const messageCreator = (eventName: ServerEventNames, message: string) => JSON.stringify({
-        Server: [
-            eventName,
-            { message }
-        ]
-    });
+            if (!csrfCookie)
+                return new Response('Security issue: CSRF token not found', { status: 404 });
 
-    ws.send(messageCreator('Hai bhai', 'Requesting Channel name'));
+            if (state !== csrfCookie)
+                return new Response('Security issue: CSRF token mismatch', { status: 404 });
 
-    ws.on('message', res => {
-        let message: ClientMessageFormat | ClientPong = JSON.parse(res.toString());
-        if ( 'Pong' in message && message.Pong === 'Sim bhai, estou aqui!') return;
-        else if ( 'Client' in message && message.Client[0] == 'Ola bhai') {
-            ws.channel = message.Client[1].channel;
-            ws.send(messageCreator('GG bhai', 'Successfully added the channel, await for information'));
-        }
-        else if ('Client' in message && message.Client[0] == "Handshake") {
-            let kukoroData = readFileSync(kukoroPath, 'utf-8')
-            ws.send(`{ "Server": [ "GG", { "message": ${kukoroData} } ] }`)
-        } else if ('Client' in message && message.Client[0] == 'fetchData') {
-            let kukoroData = readFileSync(kukoroPath, 'utf-8')
-            ws.send(`{ "Server": [ "GG", { "message": ${kukoroData} } ] }`)
-        } else if ('Client' in message && message.Client[0] == 'updateToggleData') {
-            let kukoroData = JSON.parse(readFileSync(kukoroPath, 'utf-8'));
-            if (message.Client[1].message == 'true') kukoroData.KukoroModuleToggle = true
-            else kukoroData.KukoroModuleToggle = false;
-            writeFileSync(kukoroPath, JSON.stringify(kukoroData, null, 2));
-            let mode; // Could be this undefined Better log on client side O_o
-            if (kukoroData.KukoroModuleToggle == true) mode = "Kukoro Module turned on"
-            else {
-                mode = "Kukoro Module turned off";
-                kukoro.ResetDatabase(['OneTwoThree', 'Dungeon', 'Sniper'])
+            const isValid = CSRF.verify(csrfCookie, { secret: Bun.env.CSRF_SECRET });
+
+            if (!isValid)
+                return new Response('Security issue: Invalid CSRF token', { status: 404 });
+
+            // Proceed with the OAuth flow
+            const code = url.searchParams.get('code');
+
+            if (!code) {
+                const error = url.searchParams.get('error');
+                const errorDescription = url.searchParams.get('error_description');
+                return Response.json({ error, errorDescription }, { status: 404 });
             }
-            ws.send(`{ "Server": [ "console", { "message": ${mode} } ] }`)
-            client.say("#gianaa_", `${mode}`)
 
+            return Response.redirect(`/auth/register?code=${code}&grant_type=authorization_code&user_type=${authType}`);
+        },
+        '/auth/register': async (req: Bun.BunRequest<'/auth/register'>) => {
+            const url = new URL(req.url);
+            const code = url.searchParams.get('code')!;
+            const grant_type = url.searchParams.get('grant_type')!;
+            const userType = url.searchParams.get('user_type') as 'app' | 'broadcaster';
+            const forwardResponse = req.headers.get('Auth-User-Type') === 'app';
 
-        } else if ('Client' in message && message.Client[0] == 'sendMessageAsBot') {
-            client.say(`${message.Client[1].channel}`, `${message.Client[1].message}`)
-            ws.send(`{ "Server": [ "console", { "message": "Message sent to the channel successfully" } ] }`)
+            const generateToken = await fetch('https://id.twitch.tv/oauth2/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    code,
+                    grant_type,
+                    client_id: Bun.env.TWITCH_CLIENT_ID,
+                    client_secret: Bun.env.TWITCH_CLIENT_SECRET,
+                    redirect_uri: `http://localhost:${Bun.env.PORT}/auth/callback`
+                }),
+            });
+
+            if (!generateToken.ok) {
+                const error = await generateToken.json();
+                return Response.json(error, { status: generateToken.status });
+            }
+
+            const tokenResponse = await generateToken.json() as TwitchAuth;
+
+            const doesTokenFileExists = await tokenFile.exists();
+            let tokens: Record<'app' | 'broadcaster', TwitchAuth | null> = {
+                "app": null,
+                "broadcaster": null
+            };
+
+            if (doesTokenFileExists) {
+                tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+            }
+
+            tokens[userType] = tokenResponse;
+
+            await tokenFile.write(JSON.stringify(tokens, null, 2));
+
+            if (forwardResponse)
+                return Response.json(tokenResponse);
+            else
+                return new Response(`You may close this window now.`);
         }
-    });
+    }
+});
 
-    setInterval(() => ws.send(JSON.stringify({ Ping: "Kya tum yahaan pe ho bhai?" })), 25000)
-})
+console.log(`Local server running on http://localhost:${server.port}\nTo terminate the app, press Ctrl+C\n`);
 
-client.Start();
+if (!await tokenFile.exists())
+    console.warn(`⚠️  No app tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/app ❗ USING BOT ACCOUNT ❗ and restart the app.`);
+
+else {
+    let tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+
+    if (!tokens.broadcaster) {
+        console.warn(`⚠️  No broadcaster tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/broadcaster ❗ USING BROADCASTER ACCOUNT ❗ and restart the app.`);
+    }
+
+    else {
+        const appValidationResponse = await fetch('https://id.twitch.tv/oauth2/validate', {
+            headers: {
+                'Authorization': `Bearer ${tokens.app!.access_token}`
+            }
+        });
+
+        if (!appValidationResponse.ok) {
+            console.warn(`⚠️  App token expired. Re-authenticating...`);
+            const response = await fetch(`/auth/register?code=${tokens.app?.refresh_token}&grant_type=refresh_token&user_type=app`, {
+                headers: {
+                    'Auth-User-Type': 'app'
+                }
+            });
+
+            const data = await response.json() as TwitchAuth;
+            tokens.app = data;
+            console.log(`✅  App token refreshed successfully.`);
+        }
+
+        const broadcasterValidationResponse = await fetch('https://id.twitch.tv/oauth2/validate', {
+            headers: {
+                'Authorization': `Bearer ${tokens.broadcaster!.access_token}`
+            }
+        });
+
+        if (!broadcasterValidationResponse.ok) {
+            console.warn(`⚠️  Broadcaster token expired. Re-authenticating...`);
+            const response = await fetch(`/auth/register?code=${tokens.broadcaster?.refresh_token}&grant_type=refresh_token&user_type=broadcaster`, {
+                headers: {
+                    'Auth-User-Type': 'app'
+                }
+            });
+
+            const data = await response.json() as TwitchAuth;
+            tokens.broadcaster = data;
+            console.log(`✅  Broadcaster token refreshed successfully.`);
+        }
+
+        const twitchClient = new Client({
+            options: {
+                debug: Bun.env.NODE_ENV === 'development',
+                clientId: Bun.env.TWITCH_CLIENT_ID,
+            },
+            identity: {
+                username: Bun.env.TWITCH_USERNAME,
+                password: `oauth:${tokens.app!.access_token}`,
+            },
+            channels: ['d3fau4t']
+        });
+
+        twitchClient.connect().catch(console.error);
+
+        twitchClient.on('connected', () => {
+            twitchClient.say('d3fau4t', `Test`);
+        });
+    }
+}
