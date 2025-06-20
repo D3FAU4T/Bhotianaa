@@ -14,7 +14,7 @@ const server = Bun.serve({
             const { authtype } = req.params;
 
             if (authtype !== 'app' && authtype !== 'broadcaster')
-                return new Response(`Invalid auth type. Use "app" or "broadcaster" after 'http://localhost:${Bun.env.PORT}/auth/'.`, { status: 400 });
+                return new Response(`Invalid auth type. Use "app" or "broadcaster" after 'http://localhost:${Bun.env.PORT}/auth/'.`, { status: 404 });
 
             const scopes: Scopes = await Bun.file(process.cwd() + `/src/Config/scopes.json`).json();
             const expiresInMs = 1000 * 60 * 20; // 20 minutes
@@ -24,11 +24,22 @@ const server = Bun.serve({
 
             const expires = new Date(Date.now() + expiresInMs).toUTCString();
 
-            return Response.redirect(`${Bun.env.TWITCH_AUTH_URL}?client_id=${Bun.env.TWITCH_CLIENT_ID}&redirect_uri=http://localhost:${Bun.env.PORT}/auth/callback&response_type=code&scope=${encodeURIComponent(scopes[authtype].join(' '))}&state=${state}`, {
-                headers: {
-                    "Set-Cookie": `csrf=${state}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}, auth_type=${authtype}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`,
-                }
-            });
+            const headers = new Headers();
+            headers.append('Set-Cookie', `csrf=${state}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`);
+            headers.append('Set-Cookie', `auth_type=${authtype}; Path=/; HttpOnly; SameSite=Lax; Expires=${expires}`);
+
+            const redirect_uri = [
+                `client_id=${Bun.env.TWITCH_CLIENT_ID}`,
+                `redirect_uri=http://localhost:${Bun.env.PORT}/auth/callback`,
+                `response_type=code`,
+                `scope=${encodeURIComponent(scopes[authtype].join(' '))}`,
+                `state=${state}`
+            ];
+
+            return Response.redirect(
+                Bun.env.TWITCH_AUTH_URL + '?' + redirect_uri.join('&'),
+                { headers }
+            );
         },
         '/auth/callback': async (req: Bun.BunRequest<'/auth/callback'>) => {
             const url = new URL(req.url);
@@ -64,7 +75,7 @@ const server = Bun.serve({
         '/auth/register': async (req: Bun.BunRequest<'/auth/register'>) => {
             const url = new URL(req.url);
             const code = url.searchParams.get('code')!;
-            const grant_type = url.searchParams.get('grant_type')!;
+            const grant_type = url.searchParams.get('grant_type')! as 'authorization_code' | 'refresh_token';
             const userType = url.searchParams.get('user_type') as 'app' | 'broadcaster';
             const forwardResponse = req.headers.get('Auth-User-Type') === 'app';
 
@@ -101,7 +112,10 @@ const server = Bun.serve({
 
             tokens[userType] = tokenResponse;
 
-            await tokenFile.write(JSON.stringify(tokens, null, 2));
+            await tokenFile.write(JSON.stringify(tokens, null, 4));
+
+            if (grant_type === 'authorization_code')
+                console.log(`✅  ${userType.charAt(0).toUpperCase() + userType.slice(1)} token saved successfully.\nPlease restart the app to continue the next phase.`);
 
             if (forwardResponse)
                 return Response.json(tokenResponse);
@@ -114,13 +128,13 @@ const server = Bun.serve({
 console.log(`Local server running on http://localhost:${server.port}\nTo terminate the app, press Ctrl+C\n`);
 
 if (!await tokenFile.exists())
-    console.warn(`⚠️  No app tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/app ❗ USING BOT ACCOUNT ❗ and restart the app.`);
+    console.warn(`⚠️  No app tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/app ❗ USING BOT ACCOUNT ❗`);
 
 else {
     let tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
 
     if (!tokens.broadcaster) {
-        console.warn(`⚠️  No broadcaster tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/broadcaster ❗ USING BROADCASTER ACCOUNT ❗ and restart the app.`);
+        console.warn(`⚠️  No broadcaster tokens found. Please authenticate first by visiting http://localhost:${Bun.env.PORT}/auth/broadcaster ❗ USING BROADCASTER ACCOUNT ❗`);
     }
 
     else {
