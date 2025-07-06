@@ -1,228 +1,165 @@
 import { Client } from 'tmi.js';
-export class Bhotianaa extends Client {
+import type { ChatUserstate } from 'tmi.js';
+import type { BotState, ICommand } from '../Typings/Bhotianaa';
 
-    public BigWord: string | null;
-    public TemporaryLink: string | null;
-    public CustomCommands: Map<string, CommandsInterface>;
-    public BotOptions: BotOptions;
+class Bhotianaa {
+    public twitch: Client;
+    public commands: Map<string, ICommand>;
+    public state: BotState;
 
-    private BigWordActive: boolean;
-    private BigWordMessageCount: number;
-
-    private static readonly TwitchHeaders = Bhotianaa.MakeHeader(false);
-    private static readonly TwitchStreamerHeaders = Bhotianaa.MakeHeader(true);
-    private static readonly DictionaryHeaders = {
-        'app_id': process.env['OD_ID'],
-        'app_key': process.env['OD_KEY']
-    };
-
-    constructor(ChannelName: string, Options?: BotOptions) {
-        super({
-            options: { clientId: process.env['clientId'], debug: true },
-            connection: { reconnect: true },
-            identity: {
-                username: 'bhotianaa_',
-                password: process.env['password']
+    constructor(password: string) {
+        this.twitch = new Client({
+            options: {
+                debug: Bun.env.NODE_ENV === 'development',
+                clientId: Bun.env.TWITCH_CLIENT_ID,
             },
-            channels: [ChannelName]
+            identity: {
+                username: Bun.env.TWITCH_USERNAME,
+                password: `oauth:${password}`,
+            },
+            channels: Bun.env.TWITCH_CHANNELS?.split(',') || ['gianaa_']
         });
 
-        this.BigWord = null;
-        this.BigWordActive = false;
-        this.BigWordMessageCount = 0;
-        this.CustomCommands = new Map();
-        this.TemporaryLink = (JSON.parse(readFileSync('./src/Config/Links.json', 'utf-8')) as { Link: string; }).Link;
-        this.BotOptions = Options || {
-            WebSocket: null
+        this.commands = new Map();
+        this.state = {
+            bigWord: null,
+            bigWordActive: false,
+            bigWordMessageCount: 0,
+            temporaryLink: null
         };
+
+        this.setupEventHandlers();
     }
 
-    private static MakeHeader(StreamerMode: boolean) {
-        return {
-            'Client-Id': process.env['clientId'],
-            'Authorization': StreamerMode ? process.env['authStreamer'] : process.env['auth'],
-            'Content-Type': 'application/json'
-        }
-    }
-
-    public async Start(): Promise<void> {
-        await this.LoadCustomCommands().catch(console.error);
-        await this.connect().catch(console.error);
-
-        this.on('message', (channel, userstate, message, self) => {
+    private setupEventHandlers(): void {
+        this.twitch.on('message', async (channel, userstate, message, self) => {
             if (self || message.startsWith('/')) return;
 
-            if (this.BigWordActive) this.BigWordMessageCount++;
-            if (this.BigWordActive && this.BigWordMessageCount === 7) {
-                this.say(channel, `Nerdge letters --> ${this.BigWord}`);
-                this.BigWordMessageCount = 0;
+            // Handle big word tracking
+            if (this.state.bigWordActive) {
+                this.state.bigWordMessageCount++;
+                if (this.state.bigWordMessageCount === 7) {
+                    this.state.bigWord ? this.twitch.say(channel, this.state.bigWord) : null;
+                    this.state.bigWordMessageCount = 0;
+                }
             }
 
-            // Commands Handler
-            if (message.startsWith('!')) {
-                const [CommandName, ...CommandArgs] = message.split(' ');
-                const Command = this.CustomCommands.get(CommandName.slice(1).toLowerCase());
+            // Handle commands
+            if (message.startsWith('!'))
+                return await this.handleCommand(channel, userstate, message);
 
-                if (Command) Command.Run({ Channel: channel, Message: message, UserState: userstate }, this);
+            // Handle special messages
+            if (message === ']') {
+                const bracketCommand = this.commands.get(']')!;
+                return await bracketCommand.execute(
+                    { channel, userstate, message, args: [] },
+                    this
+                );
             }
 
-            else if (message === ']') this.CustomCommands.get(']')?.Run({ Channel: channel, Message: message, UserState: userstate }, this);
-
-            if (message.endsWith('-')) this.say(channel, message.slice(0, -1));
+            // Handle message ending with ',' (repeat without comma)
+            if (message.endsWith(',')) {
+                const msgToRepeat = message.slice(0, -1);
+                if (msgToRepeat.length)
+                    this.twitch.say(channel, msgToRepeat);
+            }
         });
     }
 
-    public async ImportFile<T>(filePath: string): Promise<T> {
-        return await require(filePath).default as T;
-    }
+    private async handleCommand(channel: string, userstate: ChatUserstate, message: string): Promise<void> {
+        const args = message.slice(1).split(' ');
+        const commandName = args.shift()?.toLowerCase();
 
-    public async LoadCustomCommands(): Promise<void> {
-        const CommandFiles = await globPromise(`${__dirname}/../Commands/*{.ts,.js}`);
+        if (!commandName) return;
 
-        CommandFiles.forEach(async FilePath => {
-            const Command = await this.ImportFile<CommandsInterface>(FilePath);
-            this.CustomCommands.set(Command.Name, Command);
-        });
-    }
+        const command = this.commands.get(commandName);
+        if (!command) return;
 
-    public SetBigWord(Word: string): string | null {
-        this.BigWordActive = true;
-        this.BigWord = Word.replace(/\p{Emoji}/gu, '').toUpperCase().split('').join(' ');
-        const IsAnnounced = this.Announce(`Nerdge letters --> ${this.BigWord}`, 'blue');
-        this.BigWordMessageCount = 0;
-        if (!IsAnnounced) return `Nerdge letters --> ${this.BigWord}`;
-        else return null;
-    }
-
-    public UnsetBigWord(): void {
-        this.BigWordActive = false;
-        this.BigWord = null;
-        this.BigWordMessageCount = 0;
-    }
-
-    public Announce(Text: string, color?: AnnounceColors): boolean {
-        try {
-            const DataToPost = {
-                message: Text,
-                color: color || 'primary'
-            };
-
-            axios.post(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=518259240&moderator_id=836876180`, DataToPost, { headers: Bhotianaa.TwitchHeaders });
-            return true;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return false;
+        // Check moderator permissions
+        if (command.moderatorOnly && !this.hasModPermissions(channel, userstate)) {
+            return;
         }
-    }
 
-    public async GetRandomClip(ChannelName: string): Promise<StreamGoodClips | StreamGoodClipsError | null> {
+        // Execute command
         try {
-            const { data } = await axios.get<StreamGoodClips | StreamGoodClipsError>(`https://streamgood.gg/shoutout/api?channel=${ChannelName}&mode=random&last_game=true&max_length=60&filter_long_videos=true`);
-            return data;
-        } catch (error) {
-            const err = error as AxiosError;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return null;
+            await command.execute({ channel, userstate, message, args }, this);
         }
-    }
 
-    public HasModPermissions(Channel: string, UserState: ChatUserstate): boolean {
-        return UserState.mod || UserState["user-type"] === 'mod' || UserState.username === Channel.slice(1);
-    }
+        catch (error) {
+            console.error(`Error executing command ${commandName}:`, error);
 
-    public async GetUserData(Username: string): Promise<GetUser | null> {
-        try {
-            const { data } = await axios.get<GetUser>(`https://api.twitch.tv/helix/users?login=${Username}`, { headers: Bhotianaa.TwitchStreamerHeaders });
-            return data;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return null;
-        }
-    }
-
-    public async GetChannelData(BroadcasterID: string | number): Promise<GetChannel | null> {
-        try {
-            const { data } = await axios.get<GetChannel>(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { headers: Bhotianaa.TwitchStreamerHeaders });
-            return data;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return null;
-        }
-    }
-
-    public async GetUptime(ChannelName: string): Promise<string> {
-        try {
-            const { data } = await axios.get<string>(`https://decapi.me/twitch/uptime?channel=${ChannelName.replace(/\#/g, '')}`);
-            return data;
-        } catch (err) {
-            return 'An error occurred while executing this command'
-        }
-    }
-
-    public async GetGame(GameName: string): Promise<GetGames | null> {
-        try {
-            const { data } = await axios.get<GetGames>(`https://api.twitch.tv/helix/games?name=${GameName}`, { headers: Bhotianaa.TwitchHeaders });
-            return data;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return null;
-        }
-    }
-
-    public SetGame(BroadcasterID: string | number, GameID: string | number): boolean {
-        try {
-            axios.patch(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { 'game_id': `${GameID}` }, { headers: Bhotianaa.TwitchStreamerHeaders });
-            return true;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return false;
-        }
-    }
-
-    public SetTitle(BroadcasterID: string | number, Title: string): boolean {
-        try {
-            axios.patch(`https://api.twitch.tv/helix/channels?broadcaster_id=${BroadcasterID}`, { "title": Title }, { headers: Bhotianaa.TwitchStreamerHeaders });
-            return true;
-        } catch (error) {
-            const err = error as AxiosError<TwitchAPIStandardError>;
-            appendFileSync(LogErrorPath, `${err.response?.data}\n\n`);
-            console.error(err.response?.data);
-            return false;
-        }
-    }
-
-    public async DefineWord(Word: string): Promise<string> {
-        if (Word == undefined || Word == null || Word.length == 0) return "This command is used for defining words. Usage: !define <word>";
-
-        const WordId = remove(Word);
-        let data = '';
-
-        try {
-            const res = await axios.get<OxfordDictionaryAPI>(`https://od-api.oxforddictionaries.com/api/v2/entries/en-gb/${WordId}?fields=definitions&strictMatch=false`, { headers: Bhotianaa.DictionaryHeaders });
-            data = res.data.results[0].lexicalEntries[0].entries[0].senses[0].definitions[0];
-        } catch (err) {
-            try {
-                const resp = await axios.get<DictionaryAPI[]>(`https://api.dictionaryapi.dev/api/v2/entries/en/${WordId}`);
-                data = `${Word}: ${resp.data[0].meanings[0].definitions[0].definition}`;
-            } catch (error) {
-                data = `Oh no, I don't know the definition of ${Word}, Mamma help D:`;
+            // Provide user feedback for command errors
+            if (error instanceof Error) {
+                if (Bun.env.NODE_ENV === 'development')
+                    await this.twitch.say(channel, `[DEV ERROR]: ${commandName} - ${error.message}`);
+                
+                else
+                    await this.twitch.say(channel, `[ERROR]: Command ${commandName} failed to execute.`);
             }
         }
-        return data;
     }
 
-    public SetLink(Link: string): void {
-        this.TemporaryLink = Link;
+    public hasModPermissions(channel: string, userstate: ChatUserstate): boolean {
+        return userstate.mod ||
+            userstate['user-type'] === 'mod' ||
+            userstate.username === channel.slice(1);
+    }
+
+    public async initializeState(): Promise<void> {
+        // Load temporary link from config
+        try {
+            const linkFile = Bun.file('./src/Config/Links.json');
+            if (await linkFile.exists()) {
+                const linkData = await linkFile.json() as { Link: string };
+                this.state.temporaryLink = linkData.Link;
+            }
+        } catch (error) {
+            console.warn('Could not load temporary link from config:', error);
+        }
+    }
+
+    public async loadCommands(): Promise<void> {
+        const commandsPath = import.meta.dir + '/../Commands';
+        const glob = new Bun.Glob('*.{ts,js}');
+
+        try {
+            for await (const file of glob.scan(commandsPath)) {
+                const commandModule = await import(`../Commands/${file}`);
+                const command = commandModule.default as ICommand;
+
+                if (command && command.name && typeof command.execute === 'function') {
+                    this.commands.set(command.name, command);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading commands:', error);
+        }
+    }
+
+    public async connect(): Promise<void> {
+        await this.initializeState();
+        await this.loadCommands();
+        await this.twitch.connect();
+        console.log('🤖 Bot connected to Twitch!');
+    }
+
+    // Bot utility methods
+    public setBigWord(word: string): string | null {
+        this.state.bigWordActive = true;
+        this.state.bigWord = word.replace(/\p{Emoji}/gu, '').toUpperCase().split('').join(' ');
+        this.state.bigWordMessageCount = 0;
+        return this.state.bigWord;
+    }
+
+    public unsetBigWord(): void {
+        this.state.bigWordActive = false;
+        this.state.bigWord = null;
+        this.state.bigWordMessageCount = 0;
+    }
+
+    public setLink(link: string): void {
+        this.state.temporaryLink = link;
     }
 }
+
+export default Bhotianaa;

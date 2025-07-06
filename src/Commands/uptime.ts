@@ -1,11 +1,30 @@
-import { Command } from "../Core/Client";
+import { server } from '../..';
+import type Bhotianaa from '../Core/Client';
+import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
-export default new Command({
-    Name: 'uptime',
-    Description: 'Gets the uptime of the stream',
-    Run: async ({ Message, Channel }, Client) => {
-        const Uptime = await Client.GetUptime(Channel);
-        if (Uptime === 'gianaa_ is offline') Client.say(Channel, `Shhh, my mamma is sleeping, do not disturb her`);
-        else Client.say(Channel, `My mamma has been live for ${Uptime} blobDance`);
+export default <ICommand>{
+    name: 'uptime',
+    description: 'Gets the uptime of the stream',
+    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
+        let uptime: string;
+
+        if (context.args[0]) {
+            const response = await fetch(server.url + `uptime/${context.args[0]}`);
+            uptime = await response.text();
+        }
+
+        else {
+            const response = await fetch(server.url + `uptime/${context.channel.replace('#', '')}`);
+            uptime = await response.text();
+        }
+
+        if (uptime === 'gianaa_ is offline')
+            await client.twitch.say(context.channel, 'Shhh, my mamma is sleeping, do not disturb her');
+
+        else if (context.args[0]?.toLowerCase() === 'gianaa_') {
+            await client.twitch.say(context.channel, `My mamma has been live for ${uptime} blobDance`);
+        }
+
+        else await client.twitch.say(context.channel, `@${context.userstate.username}, ${uptime} VoHiYo`);
     }
-})
+};

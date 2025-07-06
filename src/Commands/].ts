@@ -1,10 +1,11 @@
-import { Command } from "../Core/Client";
+import type Bhotianaa from '../Core/Client';
+import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
-export default new Command({
-    Name: ']',
-    Description: 'Unsets the Big Word and stops it\'s repeation',
-    Run: ({ Channel }, Client) => {
-        Client.UnsetBigWord();
-        Client.say(Channel, 'Big Word trigger removed  PepeHands');
+export default <ICommand>{
+    name: ']',
+    description: 'Unsets the Big Word and stops its repetition',
+    execute(context: CommandContext, client: Bhotianaa): void {
+        client.unsetBigWord();
+        client.twitch.say(context.channel, 'Big Word trigger removed PepeHands');
     }
-})
+};

@@ -8,6 +8,7 @@ declare global {
             TWITCH_CLIENT_SECRET: string;
             TWITCH_USERNAME: string;
             TWITCH_AUTH_URL: string;
+            TWITCH_CHANNELS: string;
         }
     }
 }
