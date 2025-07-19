@@ -17,7 +17,7 @@ class Bhotianaa {
                 username: Bun.env.TWITCH_USERNAME,
                 password: `oauth:${password}`,
             },
-            channels: Bun.env.TWITCH_CHANNELS?.split(',') || ['gianaa_']
+            channels: [Bun.env.TWITCH_CHANNEL]
         });
 
         this.commands = new Map();

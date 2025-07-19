@@ -189,7 +189,7 @@ export const server = serve({
             const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
 
             if (!response.ok)
-                return Response.json({ error: "Dictionary API error", status: response.status }, { status: response.status });
+                return Response.json(await response.json(), { status: response.status });
 
             const data = await response.json() as dictionaryAPI[];
             return Response.json(data);
@@ -347,9 +347,8 @@ export const server = serve({
 
                 // Filter only valid parameters
                 for (const [key, value] of Object.entries(body)) {
-                    if (validParams.includes(key)) {
+                    if (validParams.includes(key))
                         filteredBody[key] = value;
-                    }
                 }
 
                 // Ensure at least one parameter is provided
@@ -463,8 +462,9 @@ export const server = serve({
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: body.message,
-                    color: body.color ?? 'primary'
+                    ...body,
+                    broadcaster_id: Bun.env.TWITCH_CHANNEL_ID ?
+                        Bun.env.TWITCH_CHANNEL_ID : body.broadcaster_id,
                 })
             });
 

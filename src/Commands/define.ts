@@ -13,10 +13,10 @@ export default <ICommand> {
             return;
         }
 
-        const response = await fetch(`${server.url}/define?word=${word}`);
+        const response = await fetch(`${server.url}define/${word}`);
         const result = await response.json() as dictionaryAPI[];
         
-        if ('message' in result) {
+        if (!Array.isArray(result)) {
             await client.twitch.say(context.channel, `Oh no, I don't know the definition of ${word}, Mamma help D:`);
             return;
         }
