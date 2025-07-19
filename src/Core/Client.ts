@@ -34,6 +34,7 @@ class Bhotianaa {
     private setupEventHandlers(): void {
         this.twitch.on('message', async (channel, userstate, message, self) => {
             if (self || message.startsWith('/')) return;
+            const msg = message.toLowerCase();
 
             // Handle big word tracking
             if (this.state.bigWordActive) {
@@ -45,11 +46,11 @@ class Bhotianaa {
             }
 
             // Handle commands
-            if (message.startsWith('!'))
+            if (msg.startsWith('!'))
                 return await this.handleCommand(channel, userstate, message);
 
-            // Handle special messages
-            if (message === ']') {
+            // Handle special messages - BW end trigger
+            if (msg === ']') {
                 const bracketCommand = this.commands.get(']')!;
                 return await bracketCommand.execute(
                     { channel, userstate, message, args: [] },
@@ -57,9 +58,12 @@ class Bhotianaa {
                 );
             }
 
+            if (msg.includes('bhotiana'))
+                return await this.twitch.say(channel, `@${userstate.username} What!? gianaaAngry`);
+
             // Handle message ending with ',' (repeat without comma)
-            if (message.endsWith(',')) {
-                const msgToRepeat = message.slice(0, -1);
+            if (msg.endsWith(',')) {
+                const msgToRepeat = msg.slice(0, -1);
                 if (msgToRepeat.length)
                     this.twitch.say(channel, msgToRepeat);
             }
