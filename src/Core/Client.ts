@@ -2,7 +2,7 @@ import { Client } from 'tmi.js';
 import type { ChatUserstate } from 'tmi.js';
 import type { BotState, ICommand } from '../Typings/Bhotianaa';
 
-class Bhotianaa {
+export default class {
     public twitch: Client;
     public commands: Map<string, ICommand>;
     public state: BotState;
@@ -165,5 +165,3 @@ class Bhotianaa {
         this.state.temporaryLink = link;
     }
 }
-
-export default Bhotianaa;

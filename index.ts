@@ -520,7 +520,7 @@ export const server = serve({
 
 console.log(`Local server running on ${server.url}\nTo terminate the app, press Ctrl+C\n`);
 
-if (!await tokenFile.exists())
+if (!await tokenFile.exists() || !(await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>).app)
     console.warn(`⚠️  No app tokens found. Please authenticate first by visiting ${server.url}auth/app ❗ USING BOT ACCOUNT ❗`);
 
 else {
