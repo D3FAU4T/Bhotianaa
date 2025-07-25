@@ -111,13 +111,15 @@ export const server = serve({
             const tokenResponse = await generateToken.json() as TwitchAuth;
 
             const isTokenFilePresent = await tokenFile.exists();
-            let tokens: Record<'app' | 'broadcaster', TwitchAuth | null> = {
-                "app": null,
-                "broadcaster": null
-            };
+            let tokens: Record<'app' | 'broadcaster', TwitchAuth | null>;
 
             if (isTokenFilePresent)
                 tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+
+            else tokens = {
+                app: null,
+                broadcaster: null
+            };
 
             tokens[userType] = tokenResponse;
 
@@ -133,7 +135,6 @@ export const server = serve({
         },
 
         '/auth/validate': async (req: BunRequest<'/auth/validate'>) => {
-            const url = req.url.replace(/\/auth.+/g, '');
 
             if (!await tokenFile.exists())
                 return Response.json({ error: "No tokens found. Please authenticate first." }, { status: 404 });
@@ -158,7 +159,6 @@ export const server = serve({
                     headers: { 'Auth-User-Type': 'app' }
                 });
 
-                tokens.app = await response.json() as TwitchAuth;
                 console.log(`✅  App token refreshed successfully.`);
             }
 
@@ -168,12 +168,11 @@ export const server = serve({
                     headers: { 'Auth-User-Type': 'app' }
                 });
 
-                tokens.broadcaster = await response.json() as TwitchAuth;
                 console.log(`✅  Broadcaster token refreshed successfully.`);
             }
 
             await tokenFile.write(JSON.stringify(tokens, null, 4));
-            return new Response(null, { status: 204 });
+            return Response.json(null, { status: 204 });
         },
 
         // Dictionary API Routes
