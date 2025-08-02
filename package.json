@@ -1,20 +1,20 @@
 {
-  "name": "bhotianaa",
-  "module": "index.ts",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "dev": "NODE_ENV=development bun run index.ts",
-    "start": "NODE_ENV=production bun run index.ts"
-  },
-  "devDependencies": {
-    "@types/bun": "^1.2.19",
-    "@types/tmi.js": "^1.8.6"
-  },
-  "peerDependencies": {
-    "typescript": "^5.8.3"
-  },
-  "dependencies": {
-    "tmi.js": "^1.8.5"
-  }
+    "name": "bhotianaa",
+    "module": "index.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "dev": "bun --env-file=.env.development.local run index.ts",
+        "start": "bun run index.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.2.19",
+        "@types/tmi.js": "^1.8.6"
+    },
+    "peerDependencies": {
+        "typescript": "^5.9.2"
+    },
+    "dependencies": {
+        "tmi.js": "^1.8.5"
+    }
 }
