@@ -7,15 +7,17 @@ export default class {
     public commands: Map<string, ICommand>;
     public state: BotState;
 
-    constructor(password: string) {
+    constructor(accessToken: string, username?: string) {
+        const botUsername = username || Bun.env.TWITCH_USERNAME;
+        
         this.twitch = new Client({
             options: {
                 debug: Bun.env.NODE_ENV === 'development',
                 clientId: Bun.env.TWITCH_CLIENT_ID,
             },
             identity: {
-                username: Bun.env.TWITCH_USERNAME,
-                password: `oauth:${password}`,
+                username: botUsername,
+                password: `oauth:${accessToken}`,
             },
             channels: [Bun.env.TWITCH_CHANNEL]
         });
@@ -59,7 +61,7 @@ export default class {
             }
 
             if (msg.includes('bhotiana'))
-                return await this.twitch.say(channel, `@${userstate.username} What!? gianaaAngry`);
+                return await this.twitch.say(channel, `@${userstate.username} What!? 👀`);
 
             // Handle message ending with ',' (repeat without comma)
             if (msg.endsWith(',')) {
@@ -80,9 +82,8 @@ export default class {
         if (!command) return;
 
         // Check moderator permissions
-        if (command.moderatorOnly && !this.hasModPermissions(channel, userstate)) {
+        if (command.moderatorOnly && !this.hasModPermissions(channel, userstate))
             return;
-        }
 
         // Execute command
         try {
@@ -117,7 +118,9 @@ export default class {
                 const linkData = await linkFile.json() as { Link: string };
                 this.state.temporaryLink = linkData.Link;
             }
-        } catch (error) {
+        }
+        
+        catch (error) {
             console.warn('Could not load temporary link from config:', error);
         }
     }
@@ -135,16 +138,35 @@ export default class {
                     this.commands.set(command.name, command);
                 }
             }
-        } catch (error) {
+        }
+        
+        catch (error) {
             console.error('Error loading commands:', error);
         }
     }
 
     public async connect(): Promise<void> {
-        await this.initializeState();
-        await this.loadCommands();
-        await this.twitch.connect();
-        console.log('🤖 Bot connected to Twitch!');
+        try {
+            await this.initializeState();
+            await this.loadCommands();
+            
+            // Add error event handlers
+            this.twitch.on('disconnected', (reason) => {
+                console.error('🔥 Bot disconnected:', reason);
+            });
+            
+            this.twitch.on('notice', (channel, msgid, message) => {
+                console.error('🔥 Notice:', msgid, message);
+            });
+            
+            await this.twitch.connect();
+            console.log('🤖 Bot connected to Twitch!');
+        }
+        
+        catch (error) {
+            console.error('🔥 Failed to connect bot:', error);
+            throw error;
+        }
     }
 
     // Bot utility methods

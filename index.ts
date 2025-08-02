@@ -153,26 +153,30 @@ export const server = serve({
                 headers: { 'Authorization': `Bearer ${tokens.broadcaster.access_token}` }
             });
 
+            let toForward: TwitchAuth | null = null;
+
             if (!appValidationResponse.ok) {
                 console.warn(`⚠️  App token expired. Re-authenticating...`);
-                const response = await fetch(`${req.url}/auth/register?code=${tokens.app.refresh_token}&grant_type=refresh_token&user_type=app`, {
+                const response = await fetch(`${req.url.replace('/auth/validate', '')}/auth/register?code=${tokens.app.refresh_token}&grant_type=refresh_token&user_type=app`, {
                     headers: { 'Auth-User-Type': 'app' }
                 });
 
+                toForward = tokens.app = await response.json() as TwitchAuth;
                 console.log(`✅  App token refreshed successfully.`);
             }
 
             if (!broadcasterValidationResponse.ok) {
                 console.warn(`⚠️  Broadcaster token expired. Re-authenticating...`);
-                const response = await fetch(`${req.url}/auth/register?code=${tokens.broadcaster.refresh_token}&grant_type=refresh_token&user_type=broadcaster`, {
+                const response = await fetch(`${req.url.replace('/auth/validate', '')}/auth/register?code=${tokens.broadcaster.refresh_token}&grant_type=refresh_token&user_type=broadcaster`, {
                     headers: { 'Auth-User-Type': 'app' }
                 });
 
+                toForward = tokens.broadcaster = await response.json() as TwitchAuth;
                 console.log(`✅  Broadcaster token refreshed successfully.`);
             }
 
             await tokenFile.write(JSON.stringify(tokens, null, 4));
-            return Response.json(null, { status: 204 });
+            return Response.json(toForward);
         },
 
         // Dictionary API Routes
@@ -533,21 +537,19 @@ else {
         const whoamiFile = Bun.file(path.resolve('src', 'Config', 'whoami.json'));
 
         await fetch(server.url + 'auth/validate');
-
-        if (await whoamiFile.exists()) {
-            const whoamiData = await whoamiFile.json() as whoamiData;
-            if (
-                whoamiData.app.token === tokens.app?.access_token &&
-                whoamiData.broadcaster.token === tokens.broadcaster?.access_token
-            ) {
-                // Self data available, no need to fetch again
-            }
-        }
-
-        else await fetch(server.url + '/whoami');
+        
+        // Refresh whoami data to ensure we have the latest user info
+        await fetch(server.url + '/whoami');
+        
+        // Read the updated tokens after validation
+        tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+        
+        // Get the app user's login name for the bot
+        const whoamiData = await whoamiFile.json() as whoamiData;
+        const botUsername = whoamiData.app.login;
 
         setInterval(() => fetch(server.url + '/auth/validate'), 3600000); // Validate tokens every hour
-        const twitchClient = new (await import('./src/Core/Client')).default(tokens.app!.access_token);
+        const twitchClient = new (await import('./src/Core/Client')).default(tokens.app!.access_token, botUsername);
         await twitchClient.connect();
     }
 }
