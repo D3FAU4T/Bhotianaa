@@ -11,6 +11,6 @@ export default <ICommand> {
             await client.twitch.say(context.channel, 'No T^T');
 
         else
-            await client.twitch.say(context.channel, 'gianaaBomb');
+            await client.twitch.say(context.channel, 'gianaaBomb 💥');
     }
 }
