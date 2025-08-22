@@ -1,1 +1,1 @@
-bun start
+$env:NODE_ENV="production"; bun start
