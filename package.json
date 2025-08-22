@@ -5,7 +5,7 @@
     "private": true,
     "scripts": {
         "dev": "bun --env-file=.env.development.local run index.ts",
-        "start": "bun run index.ts"
+        "start": "$env:NODE_ENV=\"production\"; bun run index.ts"
     },
     "devDependencies": {
         "@types/bun": "^1.2.19",
