@@ -18,11 +18,58 @@ export const server = serve({
             if (authtype !== 'app' && authtype !== 'broadcaster')
                 return new Response(`Invalid auth type. Use "app" or "broadcaster" after '${req.url}'`, { status: 400 });
 
-            const scopes: Scopes = await Bun.file(path.resolve('src', 'Config', 'scopes.json')).json();
+            // Check for required environment variables
+            const requiredEnvVars = [
+                'TWITCH_CLIENT_ID',
+                'CSRF_SECRET',
+                'TWITCH_AUTH_URL'
+            ];
+
+            const missingEnvVars = requiredEnvVars.filter(envVar => !Bun.env[envVar]);
+
+            if (missingEnvVars.length > 0) {
+                return new Response(
+                    `Missing required environment variables: ${missingEnvVars.join(', ')}\n\n` +
+                    `Please create a .env.development.local file with the required variables.\n` +
+                    `See .env.example for reference.`,
+                    {
+                        status: 500,
+                        headers: { 'Content-Type': 'text/plain' }
+                    }
+                );
+            }
+
+            let scopes: Scopes;
+            try {
+                scopes = await Bun.file(path.resolve('src', 'Config', 'scopes.json')).json();
+            } catch (error) {
+                return new Response(
+                    `Failed to load scopes.json: ${error}\n\n` +
+                    `Please ensure the file src/Config/scopes.json exists and is valid JSON.`,
+                    {
+                        status: 500,
+                        headers: { 'Content-Type': 'text/plain' }
+                    }
+                );
+            }
+
             const expiresInMs = 1000 * 60 * 20; // 20 minutes
-            const state = CSRF.generate(Bun.env.CSRF_SECRET, {
-                expiresIn: expiresInMs
-            });
+            let state: string;
+
+            try {
+                state = CSRF.generate(Bun.env.CSRF_SECRET, {
+                    expiresIn: expiresInMs
+                });
+            } catch (error) {
+                return new Response(
+                    `Failed to generate CSRF token: ${error}\n\n` +
+                    `Please check your CSRF_SECRET environment variable.`,
+                    {
+                        status: 500,
+                        headers: { 'Content-Type': 'text/plain' }
+                    }
+                );
+            }
 
             const expires = new Date(Date.now() + expiresInMs).toUTCString();
 
@@ -38,9 +85,17 @@ export const server = serve({
                 `state=${state}`
             ];
 
+            console.log(`🔗 Redirecting to Twitch OAuth for ${authtype} authentication...`);
+
+            const redirectUrl = Bun.env.TWITCH_AUTH_URL + '?' + redirect_uri.join('&');
+            console.log(`🔗 Redirect URL: ${redirectUrl}`);
+
             return Response.redirect(
-                Bun.env.TWITCH_AUTH_URL + '?' + redirect_uri.join('&'),
-                { headers }
+                redirectUrl,
+                {
+                    status: 302,
+                    headers
+                }
             );
         },
 
@@ -537,13 +592,13 @@ else {
         const whoamiFile = Bun.file(path.resolve('src', 'Config', 'whoami.json'));
 
         await fetch(server.url + 'auth/validate');
-        
+
         // Refresh whoami data to ensure we have the latest user info
         await fetch(server.url + '/whoami');
-        
+
         // Read the updated tokens after validation
         tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
-        
+
         // Get the app user's login name for the bot
         const whoamiData = await whoamiFile.json() as whoamiData;
         const botUsername = whoamiData.app.login;
