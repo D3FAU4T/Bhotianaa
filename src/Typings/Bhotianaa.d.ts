@@ -34,3 +34,10 @@ export interface ICommand {
     moderatorOnly?: boolean;
     execute(context: CommandContext, client: Bhotianaa): Promise<void> | void;
 }
+
+export interface DynamicCommand {
+    name: string;
+    response: string;
+    createdBy: string;
+    createdAt: string;
+}
