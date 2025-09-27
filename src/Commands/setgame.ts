@@ -10,27 +10,56 @@ export default <ICommand> {
     description: 'Sets the game of the stream',
     moderatorOnly: true,
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const gameName = context.args.join(' ');
+        const gameInput = context.args.join(' ');
 
-        if (!gameName) {
-            await client.twitch.say(context.channel, 'Usage: !setgame <game name>');
+        if (!gameInput) {
+            await client.twitch.say(context.channel, 'Usage: !setgame <game name or ID>');
             return;
         }
 
+        const gamesFile = Bun.file(path.resolve('src', 'Cache', 'games.json'));
+
         const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'whoami.json')).json() as whoamiData;
-        const gamesCache = await Bun.file(path.resolve('src', 'Cache', 'games.json')).json() as TwitchGame[];
+        const gamesCache = await gamesFile.json() as TwitchGame[];
 
-        let gameElement = gamesCache.find(game => game.name.toLowerCase() === gameName.toLowerCase());
+        let gameElement: TwitchGame | undefined;
 
-        if (!gameElement) {
-            const response = await fetch(server.url + `twitch/games?name=${encodeURIComponent(gameName)}`);
+        // Check if input is a number (game ID)
+        const gameId = parseInt(gameInput);
+
+        // Input is a game ID
+        if (!isNaN(gameId)) {
+            const response = await fetch(server.url + `twitch/games?id=${gameId}`);
             const data = await response.json() as { data: TwitchGame[] };
+            
             if (data.data.length === 0 || !data.data[0]) {
-                await client.twitch.say(context.channel, `Game "${gameName}" not found.`);
+                await client.twitch.say(context.channel, `Game with ID "${gameId}" not found.`);
                 return;
             }
 
             gameElement = data.data[0];
+
+            // Save to cache if not already present
+            if (!gamesCache.find(game => game.id === gameElement!.id)) {
+                gamesCache.push(gameElement);
+                await gamesFile.write(JSON.stringify(gamesCache, null, 2));
+            }
+        }
+        
+        // Input is a game name
+        else {
+            gameElement = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());
+
+            if (!gameElement) {
+                const response = await fetch(server.url + `twitch/games?name=${encodeURIComponent(gameInput)}`);
+                const data = await response.json() as { data: TwitchGame[] };
+                if (data.data.length === 0 || !data.data[0]) {
+                    await client.twitch.say(context.channel, `Game "${gameInput}" not found.`);
+                    return;
+                }
+
+                gameElement = data.data[0];
+            }
         }
 
         const response = await fetch(server.url + `twitch/channels?broadcaster_id=${whoamiFile.broadcaster.id}`, {
