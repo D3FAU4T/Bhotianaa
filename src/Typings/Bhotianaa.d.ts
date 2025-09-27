@@ -31,6 +31,7 @@ export interface CommandContext {
 export interface ICommand {
     name: string;
     description: string;
+    aliases?: string[];
     moderatorOnly?: boolean;
     execute(context: CommandContext, client: Bhotianaa): Promise<void> | void;
 }

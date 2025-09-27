@@ -80,8 +80,19 @@ export default class {
 
         if (!commandName) return;
 
-        // Check for hard-coded commands first
-        const command = this.commands.get(commandName);
+        // Check for hard-coded commands first (direct name match)
+        let command = this.commands.get(commandName);
+
+        // If no direct match, check for aliases
+        if (!command) {
+            for (const [, cmd] of this.commands) {
+                if (cmd.aliases && cmd.aliases.includes(commandName)) {
+                    command = cmd;
+                    break;
+                }
+            }
+        }
+
         if (command) {
             // Check moderator permissions
             if (command.moderatorOnly && !this.hasModPermissions(channel, userstate))
@@ -109,10 +120,13 @@ export default class {
 
         // Check for dynamic commands
         const dynamicCommand = this.dynamicCommands.get(commandName);
+        
         if (dynamicCommand) {
             try {
                 await this.executeDynamicCommand(channel, userstate, args, dynamicCommand);
-            } catch (error) {
+            }
+            
+            catch (error) {
                 console.error(`Error executing dynamic command ${commandName}:`, error);
             }
         }
