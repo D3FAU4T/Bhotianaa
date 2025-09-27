@@ -8,7 +8,7 @@
         "start": "$env:NODE_ENV=\"production\"; bun run index.ts"
     },
     "devDependencies": {
-        "@types/bun": "^1.2.19",
+        "@types/bun": "^1.2.22",
         "@types/tmi.js": "^1.8.6"
     },
     "peerDependencies": {

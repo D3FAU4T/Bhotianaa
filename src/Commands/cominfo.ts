@@ -20,9 +20,8 @@ export default <ICommand>{
         }
 
         // Remove the ! prefix if provided
-        if (commandName.startsWith('!')) {
+        if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
-        }
 
         // Check if it's a hard-coded command
         if (client.commands.has(commandName)) {

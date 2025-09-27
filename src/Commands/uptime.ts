@@ -21,9 +21,8 @@ export default <ICommand>{
         if (uptime === 'gianaa_ is offline')
             await client.twitch.say(context.channel, 'Shhh, my mamma is sleeping, do not disturb her');
 
-        else if (context.args[0]?.toLowerCase() === 'gianaa_') {
+        else if (context.args[0]?.toLowerCase() === 'gianaa_')
             await client.twitch.say(context.channel, `My mamma has been live for ${uptime} blobDance`);
-        }
 
         else await client.twitch.say(context.channel, `@${context.userstate.username}, ${uptime} VoHiYo`);
     }

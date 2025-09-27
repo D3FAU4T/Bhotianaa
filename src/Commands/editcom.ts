@@ -21,9 +21,8 @@ export default <ICommand>{
         }
 
         // Remove the ! prefix if provided
-        if (commandName.startsWith('!')) {
+        if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
-        }
 
         // Check if it's a hard-coded command (cannot be edited)
         if (client.commands.has(commandName)) {
@@ -51,7 +50,9 @@ export default <ICommand>{
         try {
             await client.saveDynamicCommands();
             await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been updated successfully! VoHiYo`);
-        } catch (error) {
+        }
+        
+        catch (error) {
             await client.twitch.say(channel, `@${userstate.username} Failed to update command !${commandName}. Please try again.`);
         }
     }

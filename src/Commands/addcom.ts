@@ -21,9 +21,8 @@ export default <ICommand>{
         }
 
         // Remove the ! prefix if provided
-        if (commandName.startsWith('!')) {
+        if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
-        }
 
         // Validate command name
         if (!commandName || commandName.includes(' ')) {
@@ -42,10 +41,10 @@ export default <ICommand>{
         // Add the dynamic command
         const success = await client.addDynamicCommand(commandName, response, userstate.username!);
 
-        if (success) {
+        if (success)
             await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been added successfully! VoHiYo`);
-        } else {
+        
+        else
             await client.twitch.say(channel, `@${userstate.username} Failed to add command !${commandName}. Please try again.`);
-        }
     }
 };

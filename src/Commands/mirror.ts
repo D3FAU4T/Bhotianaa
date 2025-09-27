@@ -25,12 +25,13 @@ export default <ICommand>{
         client.setLink(url);
 
         // Personalized response
-        if (context.userstate.username === 'gianaa_') {
+        if (context.userstate.username === 'gianaa_')
             await client.twitch.say(context.channel, 'Updated the link, mamma 🙃');
-        } else if (context.userstate.username === 'd3fau4t') {
+        
+        else if (context.userstate.username === 'd3fau4t')
             await client.twitch.say(context.channel, 'Updated the link, papa :))');
-        } else {
+        
+        else
             await client.twitch.say(context.channel, 'Updated the link :>');
-        }
     }
 };

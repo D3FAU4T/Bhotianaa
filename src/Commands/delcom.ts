@@ -21,9 +21,8 @@ export default <ICommand>{
         }
 
         // Remove the ! prefix if provided
-        if (commandName.startsWith('!')) {
+        if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
-        }
 
         // Check if it's a hard-coded command (cannot be deleted)
         if (client.commands.has(commandName)) {
@@ -40,10 +39,10 @@ export default <ICommand>{
         // Remove the dynamic command
         const success = await client.removeDynamicCommand(commandName);
 
-        if (success) {
+        if (success)
             await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been deleted successfully! VoHiYo`);
-        } else {
+        
+        else
             await client.twitch.say(channel, `@${userstate.username} Failed to delete command !${commandName}. Please try again.`);
-        }
     }
 };
