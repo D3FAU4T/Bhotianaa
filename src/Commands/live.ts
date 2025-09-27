@@ -6,6 +6,7 @@ import type { TwitchChannel } from "../Typings/TwitchAPI";
 export default <ICommand>{
     name: 'live',
     description: 'Sends a live notification to the discord channel',
+    aliases: ['announce'],
     moderatorOnly: true,
     execute: async (context: CommandContext, client: Bhotianaa) => {
         const channelFetch = await fetch(server.url + `twitch/channels?broadcaster_id=${Bun.env.TWITCH_CHANNEL_ID}`);
