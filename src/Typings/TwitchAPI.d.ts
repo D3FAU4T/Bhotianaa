@@ -41,7 +41,7 @@ export interface TwitchAPIStandardError {
 
 export interface StreamGoodClips {
     creator_name: string;
-    clip_url: string;
+    slug: string;
     game_title: string;
     title: string;
     created_at: string;
