@@ -55,11 +55,9 @@ export default class {
 
             // Handle special messages - BW end trigger
             if (msg === ']') {
-                const bracketCommand = this.commands.get(']')!;
-                return await bracketCommand.execute(
-                    { channel, userstate, message, args: [] },
-                    this
-                );
+                this.unsetBigWord();
+                await this.twitch.say(channel, 'Big Word trigger removed PepeHands');
+                return;
             }
 
             if (msg.includes('bhotiana'))
@@ -120,12 +118,12 @@ export default class {
 
         // Check for dynamic commands
         const dynamicCommand = this.dynamicCommands.get(commandName);
-        
+
         if (dynamicCommand) {
             try {
                 await this.executeDynamicCommand(channel, userstate, args, dynamicCommand);
             }
-            
+
             catch (error) {
                 console.error(`Error executing dynamic command ${commandName}:`, error);
             }
