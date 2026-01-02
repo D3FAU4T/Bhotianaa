@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { CSRF, serve, type BunRequest } from 'bun';
+import { serve } from 'bun';
 import type { TwitchAuth } from './src/Typings/TwitchAPI';
 import type { whoamiData } from './src/Typings/Bhotianaa';
 import {

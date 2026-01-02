@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { CSRF, type BunRequest } from 'bun';
 import type { TwitchAuth, TwitchGame, TwitchUser } from '../Typings/TwitchAPI';
-import type { Scopes, whoamiData } from '../Typings/Bhotianaa';
+import type { Scopes } from '../Typings/Bhotianaa';
 import type { dictionaryAPI } from '../Typings/definitions';
 
 const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));

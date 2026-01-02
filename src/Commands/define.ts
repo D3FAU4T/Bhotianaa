@@ -6,10 +6,11 @@ import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 export default <ICommand> {
     name: 'define',
     description: 'Defines a word',
+    aliases: ['def', 'wtfis'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const word = context.args.join(' ');
         if (!word) {
-            await client.twitch.say(context.channel, 'Usage: !define <word>');
+            await client.twitch.say(context.channel, 'Usage: !def <word>');
             return;
         }
 
