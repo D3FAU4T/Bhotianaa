@@ -1,8 +1,7 @@
 import path from 'node:path';
 import { CSRF, type BunRequest } from 'bun';
 import type { TwitchAuth, TwitchGame, TwitchUser } from '../Typings/TwitchAPI';
-import type { Scopes } from '../Typings/Bhotianaa';
-import type { dictionaryAPI } from '../Typings/definitions';
+import type { Scopes, whoamiData } from '../Typings/Bhotianaa';
 
 const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
@@ -239,13 +238,7 @@ export const handleDefine = async (req: BunRequest<'/define/:word'>) => {
             example: "Use /define/hello"
         }, { status: 400 });
 
-    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-
-    if (!response.ok)
-        return Response.json(await response.json(), { status: response.status });
-
-    const data = await response.json() as dictionaryAPI[];
-    return Response.json(data);
+    return Response.redirect(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
 };
 
 // Self user data
@@ -326,52 +319,35 @@ export const handleTwitchUsers = async (req: BunRequest<'/twitch/users'>) => {
         return Response.json({ error: "No broadcaster token available" }, { status: 401 });
     }
 
-    const response = await fetch(`https://api.twitch.tv/helix/users?${combinedParams.toString()}`, {
+    return await fetch(`https://api.twitch.tv/helix/users?${combinedParams.toString()}`, {
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
             'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
             'Content-Type': 'application/json'
         }
     });
-
-    if (!response.ok) {
-        return Response.json({ error: "Twitch API error", status: response.status }, { status: response.status });
-    }
-
-    const data = await response.json();
-    return Response.json(data);
 };
 
-export const handleShoutout = async (req: BunRequest<"/shoutout">) => {
+export const handleShoutout = async (req: BunRequest<"/twitch/shoutout">) => {
     const url = new URL(req.url);
-    const fromId = url.searchParams.get("from_id");
     const toId = url.searchParams.get("to_id");
 
-    if (!fromId || !toId) {
-        return Response.json({ error: "from_id and to_id parameters are required" }, { status: 400 });
+    if (!toId) {
+        return Response.json({ error: "to_id parameter is required" }, { status: 400 });
     }
 
     const tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+    const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'Whoami.json')).json() as whoamiData;
 
-    const response = await fetch("https://api.twitch.tv/helix/chat/shoutouts", {
+    return await fetch(
+        `https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${whoamiFile.broadcaster.id}&to_broadcaster_id=${toId}&moderator_id=${whoamiFile.app.id}`, {
         method: "POST",
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.broadcaster?.access_token}`,
+            'Authorization': `Bearer ${tokens.app?.access_token}`,
             'Content-Type': 'application/json'
         },
-        body: new URLSearchParams({
-            from_broadcaster_id: fromId,
-            to_broadcaster_id: toId,
-            moderator_id: fromId
-        })
     });
-
-    if (!response.ok) {
-        return Response.json({ error: "Twitch API error", status: response.status }, { status: response.status });
-    }
-
-    else return new Response('Done');
 };
 
 // Get Twitch Channel Information
@@ -389,36 +365,25 @@ export const handleTwitchChannelsGet = async (req: BunRequest<'/twitch/channels'
         return Response.json({ error: "No broadcaster token available" }, { status: 401 });
     }
 
-    const response = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterIds.join('&broadcaster_id=')}`, {
+    return await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterIds.join('&broadcaster_id=')}`, {
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
             'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
             'Content-Type': 'application/json'
         }
     });
-
-    if (!response.ok) {
-        return Response.json(await response.json(), { status: response.status });
-    }
-
-    const data = await response.json();
-    return Response.json(data);
 };
 
 // Update Twitch Channel Information
 export const handleTwitchChannelsPatch = async (req: BunRequest<'/twitch/channels'>) => {
-    const url = new URL(req.url);
-    const broadcasterId = url.searchParams.get('broadcaster_id');
+    const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'whoami.json')).json() as whoamiData;
+    const broadcasterId = whoamiFile.broadcaster.id;
 
-    if (!broadcasterId) {
-        return Response.json({ error: "broadcaster_id query parameter is required" }, { status: 400 });
-    }
-
-    const body = await req.json() as Record<string, any>;
+    const body = await req.json() as Record<string, unknown>;
 
     // Valid parameters according to Twitch API documentation
     const validParams = ['game_id', 'broadcaster_language', 'title', 'delay', 'tags'];
-    const filteredBody: Record<string, any> = {};
+    const filteredBody: Record<string, unknown> = {};
 
     // Check if any invalid parameters are provided
     const invalidParams = Object.keys(body).filter(key => !validParams.includes(key));
@@ -447,7 +412,7 @@ export const handleTwitchChannelsPatch = async (req: BunRequest<'/twitch/channel
     if (!tokens.broadcaster?.access_token)
         return Response.json({ error: "No broadcaster token available" }, { status: 401 });
 
-    const response = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterId}`, {
+    return await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterId}`, {
         method: 'PATCH',
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
@@ -456,13 +421,6 @@ export const handleTwitchChannelsPatch = async (req: BunRequest<'/twitch/channel
         },
         body: JSON.stringify(filteredBody)
     });
-
-    if (!response.ok) {
-        const error = await response.json();
-        return Response.json(error, { status: response.status });
-    }
-
-    return Response.json({ success: true });
 };
 
 // Get Twitch Game Information
@@ -500,7 +458,7 @@ export const handleTwitchGames = async (req: BunRequest<'/twitch/games'>) => {
     });
 
     if (!response.ok) {
-        return Response.json({ error: "Twitch API error", status: response.status }, { status: response.status });
+        return Response.json(await response.json(), { status: response.status });
     }
 
     const data = await response.json() as { data: TwitchGame[] };
@@ -527,8 +485,6 @@ export const handleTwitchAnnouncements = async (req: BunRequest<'/twitch/announc
     const body = await req.json() as {
         message: string;
         color?: 'primary' | 'blue' | 'green' | 'orange' | 'purple';
-        broadcaster_id: string;
-        moderator_id: string;
     };
 
     const tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
@@ -537,49 +493,26 @@ export const handleTwitchAnnouncements = async (req: BunRequest<'/twitch/announc
         return Response.json({ error: "No app token available" }, { status: 401 });
     }
 
-    const response = await fetch(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${body.broadcaster_id}&moderator_id=${body.moderator_id}`, {
+    const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'Whoami.json')).json() as whoamiData;
+
+    return await fetch(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${whoamiFile.broadcaster.id}&moderator_id=${whoamiFile.app.id}`, {
         method: 'POST',
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
             'Authorization': `Bearer ${tokens.app.access_token}`,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            ...body,
-            broadcaster_id: Bun.env.TWITCH_CHANNEL_ID ?
-                Bun.env.TWITCH_CHANNEL_ID : body.broadcaster_id,
-        })
+        body: JSON.stringify(body)
     });
-
-    if (!response.ok)
-        return Response.json(await response.json(), { status: response.status });
-
-    return Response.json({ success: true });
 };
 
 // External API Routes
 export const handleUptime = async (req: BunRequest<'/uptime/:channel'>) => {
     const { channel } = req.params;
-    const cleanChannel = channel.replace(/\#/g, '');
-
-    const response = await fetch(`https://decapi.me/twitch/uptime?channel=${cleanChannel}`);
-
-    if (!response.ok) {
-        return Response.json({ error: "DecAPI error", status: response.status }, { status: response.status });
-    }
-
-    return new Response(await response.text());
+    return Response.redirect(`https://decapi.me/twitch/uptime?channel=${channel.replace(/\#/g, '')}`);
 };
 
 export const handleClips = async (req: BunRequest<'/clips/:channel'>) => {
     const { channel } = req.params;
-
-    const response = await fetch(`https://streamgood.gg/shoutout/api?channel=${channel}&mode=random&last_game=true&max_length=60&filter_long_videos=true`);
-
-    if (!response.ok) {
-        return Response.json(await response.json(), { status: response.status });
-    }
-
-    const data = await response.json();
-    return Response.json(data);
+    return Response.redirect(`https://streamgood.gg/shoutout/api?channel=${channel}&mode=random&last_game=true&max_length=60&filter_long_videos=true`)
 };
