@@ -1,7 +1,5 @@
-import path from 'node:path';
 import { server } from '../..';
 import type Bhotianaa from '../Core/Client';
-import type { whoamiData } from '../Typings/Bhotianaa';
 import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
 export default <ICommand>{
@@ -16,35 +14,28 @@ export default <ICommand>{
             return;
         }
 
-        const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'whoami.json')).json() as whoamiData;
-
-        const response = await fetch(server.url + `twitch/channels?broadcaster_id=${whoamiFile.broadcaster.id}`, {
+        const response = await fetch(server.url + 'twitch/channels', {
             method: 'PATCH',
             body: JSON.stringify({ title })
         });
 
-        const data = await response.json() as object;
-
+        if (!response.ok) {
+            await client.twitch.say(context.channel, `Failed to set title: ${response.status} ${response.statusText}`);
+            return;
+        }
+        
         // Personalized response based on user
         if (context.userstate.username === 'd3fau4t')
             await client.twitch.say(context.channel,
-                'success' in data ?
-                    `Papa! look, I changed the title to "${title}" VoHiYo` :
-                    `Papa D: I tried to change the title but something went wrong, please check the logs :((`
+                `Papa! look, I changed the title to "${title}" VoHiYo`
             );
 
         else if (context.userstate.username === 'gianaa_')
             await client.twitch.say(context.channel,
-                'success' in data ?
-                    `Mamma! I updated the title to "${title}" :)) <3` :
-                    `Mamma D: I tried to change the title but something went wrong, please ask papa to check the logs :((`
+                `Mamma! I updated the title to "${title}" :)) <3`
             );
 
         else
-            await client.twitch.say(context.channel,
-                'success' in data ?
-                    `New title: "${title}"` :
-                    'Failed to update title, please try again later.'
-            );
+            await client.twitch.say(context.channel, `New title: "${title}"`);
     }
 };

@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { server } from '../..';
 import type Bhotianaa from '../Core/Client';
-import type { whoamiData } from '../Typings/Bhotianaa';
 import type { TwitchGame } from '../Typings/TwitchAPI';
 import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
@@ -18,9 +17,7 @@ export default <ICommand> {
         }
 
         const gamesFile = Bun.file(path.resolve('src', 'Cache', 'games.json'));
-
-        const whoamiFile = await Bun.file(path.resolve('src', 'Config', 'whoami.json')).json() as whoamiData;
-        const gamesCache = await gamesFile.json() as TwitchGame[];
+        const gamesCache = await gamesFile.exists() ? await gamesFile.json() as TwitchGame[] : [];
 
         let gameElement: TwitchGame | undefined;
 
@@ -62,33 +59,30 @@ export default <ICommand> {
             }
         }
 
-        const response = await fetch(server.url + `twitch/channels?broadcaster_id=${whoamiFile.broadcaster.id}`, {
+        const response = await fetch(server.url + 'twitch/channels', {
             method: 'PATCH',
             body: JSON.stringify({ game_id: gameElement.id })
         });
 
-        const data = await response.json() as object;
+        if (!response.ok) {
+            await client.twitch.say(context.channel, `Failed to set game: ${response.status} ${response.statusText}`);
+            return;
+        }
 
         // // Personalized response based on user
         if (context.userstate.username === 'd3fau4t')
             await client.twitch.say(context.channel,
-                'success' in data ?
-                    `Papa, Mamma is playing a new game: ${gameElement.name}` :
-                    `Something went wrong, Papa. I couldn't set the game :<`
+                `Papa, Mamma is playing a new game: ${gameElement.name}`
             );
 
         else if (context.userstate.username === 'gianaa_')
             await client.twitch.say(context.channel,
-                'success' in data ?
-                    `Mamma, I updated the game: ${gameElement.name}` :
-                    `Oh no, Mamma. I couldn't set the game :<`
+                `Papa, Mamma is playing a new game: ${gameElement.name}`
             );
 
         else
             await client.twitch.say(context.channel,
-                'success' in data ?
-                    `New game: ${gameElement.name}` :
-                    `Something went wrong. Try again later.`
+                `New game: ${gameElement.name}`
             );
     }
 };
