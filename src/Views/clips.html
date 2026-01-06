@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clips</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: transparent;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: transparent;
+        }
+
+        #consent-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+
+        #consent-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .consent-content {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            max-width: 500px;
+        }
+
+        .consent-content h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .consent-content p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        .click-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid white;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .click-indicator::before {
+            content: '👆';
+            font-size: 2.5rem;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+            }
+
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 20px rgba(255, 255, 255, 0);
+            }
+        }
+
+        .small-text {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="consent-overlay">
+        <div class="consent-content">
+            <h1>🔒 Autoplay Permission Required</h1>
+            <p>Autoplay is blocked until you interact with this page. Browsers enforce this limitation to reduce
+                unwanted or potentially malicious media playback. Click once to grant permission and start playing
+                clips.</p>
+            <div class="click-indicator"></div>
+            <p class="small-text">One click enables autoplay for this session</p>
+        </div>
+    </div>
+
+    <video playsinline webkit-playsinline id="player">
+        <source src="" type="video/mp4">
+    </video>
+
+    <script>
+        const player = /** @type {HTMLVideoElement} */ (document.getElementById('player'));
+        const source = player.querySelector('source');
+
+        const consentOverlay = document.getElementById('consent-overlay');
+
+        // Handle user interaction to enable autoplay
+        consentOverlay.addEventListener('click', () => {
+            consentOverlay.classList.add('fade-out');
+            setTimeout(() => {
+                consentOverlay.remove();
+            }, 300);
+        });
+
+        const socket = new WebSocket(`ws://${window.location.host}/clip/socket`);
+
+        socket.addEventListener('message', async (event) => {
+            if (!event.data.startsWith('{')) return;
+            const data = JSON.parse(event.data);
+            const clip = await getClipUrl(data.slug);
+            playClip(clip);
+        });
+
+        window.addEventListener('beforeunload', () => {
+            socket.close(1000, 'User refreshed/closed the browser tab');
+        });
+
+        function playClip(url) {
+            source.src = url;
+            player.load();
+            player.play();
+        }
+
+        async function getClipUrl(slug) {
+            const res = await fetch("https://gql.twitch.tv/gql", {
+                method: 'POST',
+                headers: {
+                    'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify([
+                    {
+                        operationName: "VideoAccessToken_Clip",
+                        variables: {
+                            platform: "web",
+                            slug
+                        },
+                        extensions: {
+                            persistedQuery: {
+                                version: 1,
+                                sha256Hash: "993d9a5131f15a37bd16f32342c44ed1e0b1a9b968c6afdb662d2cddd595f6c5"
+                            }
+                        }
+                    }
+                ])
+            });
+
+            const json = await res.json();
+            const token = json[0].data.clip.playbackAccessToken;
+            const sig = token.signature;
+            const value = token.value;
+            const baseVideoUrl = json[0].data.clip.videoQualities[0].sourceURL;
+            const videoUrl = baseVideoUrl + `?sig=${sig}&token=${encodeURIComponent(value)}`;
+            return videoUrl;
+        }
+    </script>
+</body>
+
+</html>

@@ -20,6 +20,8 @@ import {
     handleWhoami
 } from './src/Core/RouteFunctions';
 
+import clipsView from './src/Views/clips.html';
+
 const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
 export const server = serve({
@@ -66,7 +68,36 @@ export const server = serve({
         // External API Routes
         "/uptime/:channel": handleUptime,
 
-        "/clips/:channel": handleClips
+        // Get Twitch Clips for a channel
+        "/clips/:channel": handleClips,
+
+        "/clips": clipsView
+    },
+
+    websocket: {
+        open(ws) {
+            console.log('[ws] A client connected to the WebSocket');
+            ws.subscribe('clips');
+        },
+        message(ws, message) {
+            console.log(`[ws] Received message from client: ${message}`);
+            ws.send(`Echo: ${message}`);
+        },
+        close(ws, code, reason) {
+            ws.unsubscribe('clips');
+            console.log(`[ws:${code}] A client disconnected from the WebSocket with reason: ${reason}`);
+        }
+    },
+
+    fetch(req, server) {
+        const url = new URL(req.url);
+        
+        if (url.pathname === '/clip/socket') {
+            if (server.upgrade(req)) return;
+            else return new Response('Upgrade Required', { status: 426 });
+        }
+
+        return new Response('Not Found', { status: 404 });
     },
 
     // Global error handler - handles all uncaught errors from routes
