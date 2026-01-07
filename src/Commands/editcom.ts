@@ -37,22 +37,12 @@ export default <ICommand>{
         }
 
         const newResponse = args.slice(1).join(' ');
-        const existingCommand = client.dynamicCommands.get(commandName)!;
 
-        // Update the command while preserving original creation info
-        const updatedCommand = {
-            ...existingCommand,
-            response: newResponse
-        };
+        const success = await client.updateDynamicCommand(commandName, newResponse);
 
-        client.dynamicCommands.set(commandName, updatedCommand);
-
-        try {
-            await client.saveDynamicCommands();
+        if (success) {
             await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been updated successfully! VoHiYo`);
-        }
-        
-        catch (error) {
+        } else {
             await client.twitch.say(channel, `@${userstate.username} Failed to update command !${commandName}. Please try again.`);
         }
     }

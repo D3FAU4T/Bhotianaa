@@ -41,4 +41,12 @@ export interface DynamicCommand {
     response: string;
     createdBy: string;
     createdAt: string;
+    updatedAt?: string;
+}
+
+export interface Timer {
+    name: string;
+    message: string;
+    interval: number; // in minutes
+    enabled: boolean;
 }

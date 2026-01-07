@@ -37,7 +37,11 @@ export default <ICommand>{
         }
 
         const dynamicCommand = client.dynamicCommands.get(commandName)!;
-        const createdDate = new Date(dynamicCommand.createdAt).toLocaleDateString();
+        const date = new Date(dynamicCommand.createdAt);
+        const day = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const year = date.getFullYear();
+        const createdDate = `${day} ${month} ${year}`;
 
         await client.twitch.say(channel, `@${userstate.username} !${commandName} - Created by ${dynamicCommand.createdBy} on ${createdDate}. Response: ${dynamicCommand.response}`);
     }
