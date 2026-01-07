@@ -38,6 +38,7 @@ src/Config/tokens.json
 src/Config/whoami.json
 src/Cache/
 src/Config/dynamic-commands.json
+src/Config/timers.json
 
 # Fix version mismatch
 bun.lock

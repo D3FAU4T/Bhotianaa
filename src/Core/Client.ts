@@ -1,11 +1,14 @@
 import { Client } from 'tmi.js';
 import type { ChatUserstate } from 'tmi.js';
-import type { BotState, ICommand, DynamicCommand } from '../Typings/Bhotianaa';
+import type { BotState, ICommand, DynamicCommand, Timer } from '../Typings/Bhotianaa';
+import { server } from '../..';
 
 export default class {
     public twitch: Client;
     public commands: Map<string, ICommand>;
     public dynamicCommands: Map<string, DynamicCommand>;
+    public timers: Map<string, Timer>;
+    private runningTimers: Map<string, ReturnType<typeof setInterval>>;
     public state: BotState;
 
     constructor(accessToken: string, username?: string) {
@@ -25,6 +28,8 @@ export default class {
 
         this.commands = new Map();
         this.dynamicCommands = new Map();
+        this.timers = new Map();
+        this.runningTimers = new Map();
         this.state = {
             bigWord: null,
             bigWordActive: false,
@@ -37,6 +42,8 @@ export default class {
 
     private setupEventHandlers(): void {
         this.twitch.on('message', async (channel, userstate, message, self) => {
+            server.publish('chat', JSON.stringify({ channel, userstate, message }));
+
             if (self || message.startsWith('/')) return;
             const msg = message.toLowerCase();
 
@@ -176,6 +183,7 @@ export default class {
             await this.initializeState();
             await this.loadCommands();
             await this.loadDynamicCommands();
+            await this.loadTimers();
 
             // Add error event handlers
             this.twitch.on('disconnected', (reason) => {
@@ -241,6 +249,8 @@ export default class {
                 }
 
                 console.log(`📝 Loaded ${this.dynamicCommands.size} dynamic commands`);
+            } else {
+                console.log('📝 No dynamic-commands.json found, starting with 0 dynamic commands');
             }
         } catch (error) {
             console.warn('Could not load dynamic commands:', error);
@@ -273,6 +283,14 @@ export default class {
 
             this.dynamicCommands.set(name, command);
             await this.saveDynamicCommands();
+
+            // Publish update to all connected clients
+            const commands: Record<string, any> = {};
+            for (const [n, cmd] of this.dynamicCommands.entries()) {
+                commands[n] = cmd;
+            }
+            server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
+
             return true;
         } catch (error) {
             console.error('Error adding dynamic command:', error);
@@ -288,10 +306,202 @@ export default class {
 
             this.dynamicCommands.delete(name);
             await this.saveDynamicCommands();
+
+            // Publish update to all connected clients
+            const commands: Record<string, any> = {};
+            for (const [n, cmd] of this.dynamicCommands.entries()) {
+                commands[n] = cmd;
+            }
+            server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
+
             return true;
         } catch (error) {
             console.error('Error removing dynamic command:', error);
             return false;
         }
+    }
+
+    public async updateDynamicCommand(name: string, response: string): Promise<boolean> {
+        try {
+            const existingCommand = this.dynamicCommands.get(name);
+            if (!existingCommand) {
+                return false;
+            }
+
+            // Preserve original metadata, only update response
+            const updatedCommand: DynamicCommand = {
+                ...existingCommand,
+                response,
+                updatedAt: new Date().toISOString()
+            };
+
+            this.dynamicCommands.set(name, updatedCommand);
+            await this.saveDynamicCommands();
+
+            // Publish update to all connected clients
+            const commands: Record<string, any> = {};
+            for (const [n, cmd] of this.dynamicCommands.entries()) {
+                commands[n] = cmd;
+            }
+            server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
+
+            return true;
+        } catch (error) {
+            console.error('Error updating dynamic command:', error);
+            return false;
+        }
+    }
+
+    // Timer methods
+    public async loadTimers(): Promise<void> {
+        try {
+            const timersFile = Bun.file('./src/Config/timers.json');
+            if (await timersFile.exists()) {
+                const timersData = await timersFile.json() as Record<string, Timer>;
+
+                for (const [name, timer] of Object.entries(timersData)) {
+                    this.timers.set(name, timer);
+                    if (timer.enabled) {
+                        this.startTimer(timer);
+                    }
+                }
+
+                console.log(`⏱️ Loaded ${this.timers.size} timers`);
+            } else {
+                console.log('⏱️ No timers.json found, starting with 0 timers');
+            }
+        } catch (error) {
+            console.warn('Could not load timers:', error);
+        }
+    }
+
+    public async saveTimers(): Promise<void> {
+        try {
+            const timersData: Record<string, Timer> = {};
+
+            for (const [name, timer] of this.timers.entries()) {
+                timersData[name] = timer;
+            }
+
+            await Bun.write('./src/Config/timers.json', JSON.stringify(timersData, null, 2));
+        } catch (error) {
+            console.error('Could not save timers:', error);
+            throw error;
+        }
+    }
+
+    private startTimer(timer: Timer): void {
+        this.stopTimer(timer.name); // Ensure no duplicate intervals
+
+        const intervalMs = timer.interval * 60 * 1000;
+        const intervalId = setInterval(() => {
+            const channel = Bun.env.TWITCH_CHANNEL;
+            this.twitch.say(channel, timer.message);
+        }, intervalMs);
+
+        this.runningTimers.set(timer.name, intervalId);
+    }
+
+    private stopTimer(name: string): void {
+        const intervalId = this.runningTimers.get(name);
+        if (intervalId) {
+            clearInterval(intervalId);
+            this.runningTimers.delete(name);
+        }
+    }
+
+    public async addTimer(name: string, message: string, interval: number): Promise<boolean> {
+        // Validate interval: minimum 1 minute, maximum 1440 minutes (24 hours)
+        const validInterval = Math.max(1, Math.min(1440, Math.floor(interval)));
+
+        if (this.timers.has(name)) {
+            return false; // Timer already exists
+        }
+
+        try {
+            const timer: Timer = {
+                name,
+                message,
+                interval: validInterval,
+                enabled: true
+            };
+
+            this.timers.set(name, timer);
+            this.startTimer(timer);
+            await this.saveTimers();
+            this.broadcastTimers();
+            return true;
+        } catch (error) {
+            console.error('Error adding timer:', error);
+            return false;
+        }
+    }
+
+    public async removeTimer(name: string): Promise<boolean> {
+        try {
+            this.stopTimer(name);
+            const deleted = this.timers.delete(name);
+            if (deleted) {
+                await this.saveTimers();
+                this.broadcastTimers();
+            }
+            return deleted;
+        } catch (error) {
+            console.error('Error removing timer:', error);
+            return false;
+        }
+    }
+
+    public async toggleTimer(name: string): Promise<boolean> {
+        const timer = this.timers.get(name);
+        if (!timer) return false;
+
+        try {
+            timer.enabled = !timer.enabled;
+            if (timer.enabled) {
+                this.startTimer(timer);
+            } else {
+                this.stopTimer(name);
+            }
+            await this.saveTimers();
+            this.broadcastTimers();
+            return true;
+        } catch (error) {
+            console.error('Error toggling timer:', error);
+            return false;
+        }
+    }
+
+    public async updateTimer(name: string, message: string, interval: number): Promise<boolean> {
+        const timer = this.timers.get(name);
+        if (!timer) return false;
+
+        // Validate interval: minimum 1 minute, maximum 1440 minutes (24 hours)
+        const validInterval = Math.max(1, Math.min(1440, Math.floor(interval)));
+
+        try {
+            timer.message = message;
+            timer.interval = validInterval;
+
+            if (timer.enabled) {
+                // Restart to apply new interval
+                this.startTimer(timer);
+            }
+
+            await this.saveTimers();
+            this.broadcastTimers();
+            return true;
+        } catch (error) {
+            console.error('Error updating timer:', error);
+            return false;
+        }
+    }
+
+    private broadcastTimers(): void {
+        const timers: Record<string, Timer> = {};
+        for (const [n, t] of this.timers.entries()) {
+            timers[n] = t;
+        }
+        server.publish('commands', JSON.stringify({ type: 'allTimers', timers }));
     }
 }
