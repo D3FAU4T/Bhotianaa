@@ -1,25 +1,11 @@
-/**
- * Core Functions Module
- * 
- * This module contains shared utility functions used throughout the bot.
- * Centralizing these functions helps reduce code duplication and makes
- * maintenance easier.
- */
+import path from 'node:path';
+import type { whoamiData } from '../Typings/Bhotianaa';
 
 interface Operation {
     readonly result: number;
     readonly expression: string;
 }
 
-/**
- * Finds a mathematical expression that combines given numbers to reach a target value.
- * Uses a brute-force approach trying all combinations of +, -, *, / operations.
- * 
- * @param nums Array of numbers to use in the expression
- * @param exprs Array of string expressions corresponding to the numbers
- * @param target The target value to reach
- * @returns A string expression that equals the target, or null if none found
- */
 export function findMathExpression(nums: readonly number[], exprs: readonly string[], target: number): string | null {
     const Epsilon = 1e-6;
 
@@ -74,3 +60,62 @@ export function findMathExpression(nums: readonly number[], exprs: readonly stri
     }
     return null;
 }
+
+// Helper function to fetch stream info
+export const fetchStreamInfo = async () => {
+    try {
+        const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
+        const authData = await tokenFile.json() as whoamiData;
+        const channelId = Bun.env.TWITCH_CHANNEL_ID;
+
+        // Get channel info
+        const channelResponse = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${channelId}`, {
+            headers: {
+                'Authorization': `Bearer ${authData.broadcaster.token}`,
+                'Client-Id': Bun.env.TWITCH_CLIENT_ID!
+            }
+        });
+
+        const channelData = await channelResponse.json();
+
+        if (!channelData.data || channelData.data.length === 0) {
+            return {
+                title: 'Stream Offline',
+                gameName: 'Not Playing',
+                gameArt: '',
+                channelName: Bun.env.TWITCH_CHANNEL
+            };
+        }
+
+        const channel = channelData.data[0];
+
+        // Get game artwork if game_id exists
+        let gameArt = '';
+        if (channel?.game_id) {
+            const gameResponse = await fetch(`https://api.twitch.tv/helix/games?id=${channel.game_id}`, {
+                headers: {
+                    'Authorization': `Bearer ${authData.broadcaster.token}`,
+                    'Client-Id': Bun.env.TWITCH_CLIENT_ID!
+                }
+            });
+            const gameData = await gameResponse.json();
+            if (gameData.data && gameData.data.length > 0) {
+                gameArt = gameData.data[0].box_art_url.replace('{width}', '285').replace('{height}', '380');
+            }
+        }
+
+        return {
+            title: channel?.title || 'No Title',
+            gameName: channel?.game_name || 'Not Playing',
+            gameArt: gameArt
+        };
+    } catch (error) {
+        console.error('Error fetching stream info:', error);
+        return {
+            title: 'Error',
+            gameName: 'Error',
+            gameArt: '',
+            channelName: Bun.env.TWITCH_CHANNEL
+        };
+    }
+};

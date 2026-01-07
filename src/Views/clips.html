@@ -139,9 +139,14 @@
             }, 300);
         });
 
-        const socket = new WebSocket(`ws://${window.location.host}/clip/socket`);
+        const socket = new WebSocket(`ws://${window.location.host}/socket/clips`);
 
         socket.addEventListener('message', async (event) => {
+            if (event.data === '6') {
+                socket.send('9');
+                return;
+            }
+
             if (!event.data.startsWith('{')) return;
             const data = JSON.parse(event.data);
             const clip = await getClipUrl(data.slug);

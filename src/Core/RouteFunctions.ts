@@ -5,8 +5,6 @@ import type { Scopes, whoamiData } from '../Typings/Bhotianaa';
 
 const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
-export const handleRoot = () => new Response('Hello World!');
-
 // Initial authentication route <app | broadcaster>
 export const handleAuth = async (req: BunRequest<'/auth/:authtype'>) => {
     const { authtype } = req.params;
@@ -37,7 +35,9 @@ export const handleAuth = async (req: BunRequest<'/auth/:authtype'>) => {
     let scopes: Scopes;
     try {
         scopes = await Bun.file(path.resolve('src', 'Config', 'scopes.json')).json();
-    } catch (error) {
+    }
+    
+    catch (error) {
         return new Response(
             `Failed to load scopes.json: ${error}\n\n` +
             `Please ensure the file src/Config/scopes.json exists and is valid JSON.`,
@@ -55,7 +55,9 @@ export const handleAuth = async (req: BunRequest<'/auth/:authtype'>) => {
         state = CSRF.generate(Bun.env.CSRF_SECRET, {
             expiresIn: expiresInMs
         });
-    } catch (error) {
+    }
+    
+    catch (error) {
         return new Response(
             `Failed to generate CSRF token: ${error}\n\n` +
             `Please check your CSRF_SECRET environment variable.`,
@@ -87,10 +89,6 @@ export const handleAuth = async (req: BunRequest<'/auth/:authtype'>) => {
 
     return Response.redirect(
         redirectUrl,
-        {
-            status: 302,
-            headers
-        }
     );
 };
 
