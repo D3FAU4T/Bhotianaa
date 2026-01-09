@@ -157,6 +157,24 @@
             socket.close(1000, 'User refreshed/closed the browser tab');
         });
 
+        // Stop video at 30 seconds
+        player.addEventListener('timeupdate', () => {
+            if (player.currentTime >= 30) {
+                clearVideo();
+            }
+        });
+
+        // Clear video when it ends naturally
+        player.addEventListener('ended', () => {
+            clearVideo();
+        });
+
+        function clearVideo() {
+            player.pause();
+            source.src = '';
+            player.load();
+        }
+
         function playClip(url) {
             source.src = url;
             player.load();
