@@ -8,11 +8,12 @@ export default <ICommand> {
     name: 'setgame',
     description: 'Sets the game of the stream',
     moderatorOnly: true,
+    aliases: ['game'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const gameInput = context.args.join(' ');
 
         if (!gameInput) {
-            await client.twitch.say(context.channel, 'Usage: !setgame <game name or ID>');
+            await client.twitch.say('Usage: !setgame <game name or ID>');
             return;
         }
 
@@ -30,7 +31,7 @@ export default <ICommand> {
             const data = await response.json() as { data: TwitchGame[] };
             
             if (data.data.length === 0 || !data.data[0]) {
-                await client.twitch.say(context.channel, `Game with ID "${gameId}" not found.`);
+                await client.twitch.say(`Game with ID "${gameId}" not found.`);
                 return;
             }
 
@@ -51,7 +52,7 @@ export default <ICommand> {
                 const response = await fetch(server.url + `twitch/games?name=${encodeURIComponent(gameInput)}`);
                 const data = await response.json() as { data: TwitchGame[] };
                 if (data.data.length === 0 || !data.data[0]) {
-                    await client.twitch.say(context.channel, `Game "${gameInput}" not found.`);
+                    await client.twitch.say(`Game \"${gameInput}\" not found.`);
                     return;
                 }
 
@@ -65,23 +66,23 @@ export default <ICommand> {
         });
 
         if (!response.ok) {
-            await client.twitch.say(context.channel, `Failed to set game: ${response.status} ${response.statusText}`);
+            await client.twitch.say(`Failed to set game: ${response.status} ${response.statusText}`);
             return;
         }
 
         // // Personalized response based on user
-        if (context.userstate.username === 'd3fau4t')
-            await client.twitch.say(context.channel,
+        if (context.userstate.user_login === 'd3fau4t')
+            await client.twitch.say(
                 `Papa, Mamma is playing a new game: ${gameElement.name}`
             );
 
-        else if (context.userstate.username === 'gianaa_')
-            await client.twitch.say(context.channel,
+        else if (context.userstate.user_login === 'gianaa_')
+            await client.twitch.say(
                 `Papa, Mamma is playing a new game: ${gameElement.name}`
             );
 
         else
-            await client.twitch.say(context.channel,
+            await client.twitch.say(
                 `New game: ${gameElement.name}`
             );
     }

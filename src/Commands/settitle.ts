@@ -6,11 +6,12 @@ export default <ICommand>{
     name: 'settitle',
     description: 'Sets the title of the stream',
     moderatorOnly: true,
+    aliases: ['title'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const title = context.args.join(' ');
 
         if (!title) {
-            await client.twitch.say(context.channel, 'Usage: !settitle <title>');
+            await client.twitch.say('Usage: !settitle <title>');
             return;
         }
 
@@ -20,22 +21,22 @@ export default <ICommand>{
         });
 
         if (!response.ok) {
-            await client.twitch.say(context.channel, `Failed to set title: ${response.status} ${response.statusText}`);
+            await client.twitch.say(`Failed to set title: ${response.status} ${response.statusText}`);
             return;
         }
         
         // Personalized response based on user
-        if (context.userstate.username === 'd3fau4t')
-            await client.twitch.say(context.channel,
+        if (context.userstate.user_login === 'd3fau4t')
+            await client.twitch.say(
                 `Papa! look, I changed the title to "${title}" VoHiYo`
             );
 
-        else if (context.userstate.username === 'gianaa_')
-            await client.twitch.say(context.channel,
+        else if (context.userstate.user_login === 'gianaa_')
+            await client.twitch.say(
                 `Mamma! I updated the title to "${title}" :)) <3`
             );
 
         else
-            await client.twitch.say(context.channel, `New title: "${title}"`);
+            await client.twitch.say(`New title: \"${title}\"`);
     }
 };
