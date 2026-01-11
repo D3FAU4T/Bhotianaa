@@ -6,10 +6,10 @@ export default <ICommand>{
     description: 'List all active timers',
     aliases: ['timers'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { channel, userstate } = context;
+        const { userstate } = context;
 
         if (client.timers.size === 0) {
-            await client.twitch.say(channel, `@${userstate.username} No timers available.`);
+            await client.twitch.say(`@${userstate.user_name} No timers available.`);
             return;
         }
 
@@ -18,6 +18,6 @@ export default <ICommand>{
         );
         const timerList = timerInfo.join(', ');
 
-        await client.twitch.say(channel, `@${userstate.username} Timers: ${timerList}`);
+        await client.twitch.say(`@${userstate.user_name} Timers: ${timerList}`);
     }
 };

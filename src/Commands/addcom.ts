@@ -6,17 +6,17 @@ export default <ICommand>{
     description: 'Add a dynamic command (Mods/Broadcaster only)',
     moderatorOnly: true,
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { channel, userstate, args } = context;
+        const { userstate, args } = context;
 
         if (args.length < 2) {
-            await client.twitch.say(channel, `@${userstate.username} Usage: !addcom <!commandName> <response>`);
+            await client.twitch.say(`@${userstate.user_name} Usage: !addcom <!commandName> <response>`);
             return;
         }
 
         let commandName = args[0];
 
         if (!commandName) {
-            await client.twitch.say(channel, `@${userstate.username} Invalid command name.`);
+            await client.twitch.say(`@${userstate.user_name} Invalid command name.`);
             return;
         }
 
@@ -26,25 +26,25 @@ export default <ICommand>{
 
         // Validate command name
         if (!commandName || commandName.includes(' ')) {
-            await client.twitch.say(channel, `@${userstate.username} Invalid command name. Command names cannot contain spaces.`);
+            await client.twitch.say(`@${userstate.user_name} Invalid command name. Command names cannot contain spaces.`);
             return;
         }
 
         // Check if command already exists (hard-coded or dynamic)
         if (client.commands.has(commandName) || client.dynamicCommands.has(commandName)) {
-            await client.twitch.say(channel, `@${userstate.username} Command !${commandName} already exists.`);
+            await client.twitch.say(`@${userstate.user_name} Command !${commandName} already exists.`);
             return;
         }
 
         const response = args.slice(1).join(' ');
 
         // Add the dynamic command
-        const success = await client.addDynamicCommand(commandName, response, userstate.username!);
+        const success = await client.addDynamicCommand(commandName, response, userstate.user_login!);
 
         if (success)
-            await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been added successfully! VoHiYo`);
+            await client.twitch.say(`@${userstate.user_name} Command !${commandName} has been added successfully! VoHiYo`);
         
         else
-            await client.twitch.say(channel, `@${userstate.username} Failed to add command !${commandName}. Please try again.`);
+            await client.twitch.say(`@${userstate.user_name} Failed to add command !${commandName}. Please try again.`);
     }
 };

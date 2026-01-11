@@ -8,9 +8,9 @@ export default <ICommand> {
         const name = context.args[0]?.toLowerCase();
 
         if (name?.includes('bhotiana') || name?.includes('gianaa'))
-            await client.twitch.say(context.channel, 'No T^T');
+            await client.twitch.say('No T^T');
 
         else
-            await client.twitch.say(context.channel, 'gianaaBomb 💥');
+            await client.twitch.say('gianaaBomb 💥');
     }
 }

@@ -11,14 +11,14 @@ export default <ICommand>{
         if (!url) {
             // Get current link
             const currentLink = client.state.temporaryLink || 'No link set';
-            await client.twitch.say(context.channel, currentLink);
+            await client.twitch.say(currentLink);
             return;
         }
 
         // Check if user has permissions to set link
-        const hasPermissions = client.hasModPermissions(context.channel, context.userstate);
+        const hasPermissions = client.hasModPermissions(context.userstate);
         if (!hasPermissions) {
-            await client.twitch.say(context.channel, `@${context.userstate.username} You don't have permission to use this command`);
+            await client.twitch.say(`@${context.userstate.user_login} You don't have permission to use this command`);
             return;
         }
 
@@ -26,13 +26,13 @@ export default <ICommand>{
         client.setLink(url);
 
         // Personalized response
-        if (context.userstate.username === 'gianaa_')
-            await client.twitch.say(context.channel, 'Updated the link, mamma :))');
+        if (context.userstate.user_login === 'gianaa_')
+            await client.twitch.say('Updated the link, mamma :))');
 
-        else if (context.userstate.username === 'd3fau4t')
-            await client.twitch.say(context.channel, 'Updated the link, papa 🙃');
+        else if (context.userstate.user_login === 'd3fau4t')
+            await client.twitch.say('Updated the link, papa 🙃');
 
         else
-            await client.twitch.say(context.channel, 'Updated the link :>');
+            await client.twitch.say('Updated the link :>');
     }
 };

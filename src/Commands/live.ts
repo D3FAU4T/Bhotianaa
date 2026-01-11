@@ -9,11 +9,11 @@ export default <ICommand>{
     aliases: ['announce'],
     moderatorOnly: true,
     execute: async (context: CommandContext, client: Bhotianaa) => {
-        const channelFetch = await fetch(server.url + `twitch/channels?broadcaster_id=${Bun.env.TWITCH_CHANNEL_ID}`);
+        const channelFetch = await fetch(server.url + `twitch/channels?broadcaster_id=${client.broadcasterId}`);
         const channelData = channelFetch.ok ? await channelFetch.json() as { data: TwitchChannel[] } : null;
 
         if (!channelData) {
-            await client.twitch.say(context.channel, `Mamma, I couldn't retrieve your channel data. Can you wait a little bit for the Twitch API to update your channel data?`);
+            await client.twitch.say(`Mamma, I couldn't retrieve your channel data. Can you wait a little bit for the Twitch API to update your channel data?`);
             return;
         }
 
@@ -54,9 +54,9 @@ export default <ICommand>{
         });
 
         if (!discordNotification.ok) {
-            await client.twitch.say(context.channel, `Mamma, I couldn't send the live notification to Discord. Please check the webhook URL or call Papa.`);
+            await client.twitch.say(`Mamma, I couldn't send the live notification to Discord. Please check the webhook URL or call Papa.`);
         }
 
-        else await client.twitch.say(context.channel, `Mamma, I sent the live notification to Discord!`);
+        else await client.twitch.say(`Mamma, I sent the live notification to Discord!`);
     }
 }

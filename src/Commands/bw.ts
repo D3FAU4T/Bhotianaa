@@ -9,7 +9,7 @@ export default <ICommand>{
         const word = context.args.join(' ');
 
         if (!word) {
-            client.twitch.say(context.channel, 'Usage: !bw <word>');
+            client.twitch.say('Usage: !bw <word>');
             return;
         }
 

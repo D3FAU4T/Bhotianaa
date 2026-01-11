@@ -4,7 +4,6 @@ import CommandBlock from "./CommandBlock";
 import { useEffect, useRef, useState } from "react";
 import type { CommandContext } from "../Typings/Bhotianaa";
 
-
 const App = () => {
     const [messages, setMessages] = useState<Omit<CommandContext, 'args'>[]>([]);
     const [expandedBlock, setExpandedBlock] = useState<string | null>(null);
@@ -20,7 +19,7 @@ const App = () => {
     const [newTimerMessage, setNewTimerMessage] = useState('');
     const [newTimerInterval, setNewTimerInterval] = useState('');
     const [editingTimer, setEditingTimer] = useState<string | null>(null);
-    const [streamInfo, setStreamInfo] = useState<{ title: string, gameName: string, gameArt: string, channelName: string } | null>(null);
+    const [streamInfo, setStreamInfo] = useState<{ title: string, gameName: string, gameArt: string, channelName: string, isLive?: boolean } | null>(null);
     const ws = useRef<WebSocket | null>(null);
     const commandsWs = useRef<WebSocket | null>(null);
     const streamIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -183,8 +182,6 @@ const App = () => {
         setNewTimerMessage('');
         setNewTimerInterval('');
     };
-
-
 
     const renderExpandedContent = () => {
         switch (expandedBlock) {
@@ -1160,7 +1157,7 @@ const App = () => {
                         className="block"
                         style={{
                             gridColumn: "span 2",
-                            background: streamInfo?.gameArt && streamInfo.title !== 'Stream Offline'
+                            background: streamInfo?.gameArt && streamInfo.isLive
                                 ? `linear-gradient(135deg, rgba(15, 19, 26, 0.95) 0%, rgba(15, 19, 26, 0.85) 100%), url(${streamInfo.gameArt})`
                                 : undefined,
                             backgroundSize: 'cover',
@@ -1179,13 +1176,13 @@ const App = () => {
                                 <div style={{ zIndex: 2 }}>
                                     <div style={{
                                         fontSize: '0.75rem',
-                                        color: '#888',
+                                        color: streamInfo.isLive ? '#ef5350' : '#888',
                                         textTransform: 'uppercase',
                                         letterSpacing: '1px',
                                         marginBottom: '0.5rem',
                                         fontWeight: '600'
                                     }}>
-                                        Live Now
+                                        {streamInfo.isLive ? 'LIVE NOW' : 'OFFLINE'}
                                     </div>
                                     <h2 style={{
                                         fontSize: '1.5rem',
@@ -1226,7 +1223,7 @@ const App = () => {
                                             fontWeight: '600',
                                             marginBottom: '0.25rem'
                                         }}>
-                                            Playing
+                                            {streamInfo.isLive ? 'Playing' : 'Last seen playing'}
                                         </div>
                                         <div style={{
                                             fontSize: '1.1rem',

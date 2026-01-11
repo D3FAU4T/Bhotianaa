@@ -1,30 +1,35 @@
-import { Client } from 'tmi.js';
-import type { ChatUserstate } from 'tmi.js';
-import type { BotState, ICommand, DynamicCommand, Timer } from '../Typings/Bhotianaa';
+import EventSubWebSocket from './EventSubWebSocket';
+import TwitchAPI from './TwitchAPI';
 import { server } from '../..';
+import type { ChatUserstate } from '../Typings/EventSub.d';
+import type { BotState, ICommand, DynamicCommand, Timer } from '../Typings/Bhotianaa';
+import type { ChatMessageEvent, EventSubNotification } from '../Typings/EventSub.d';
 
 export default class {
-    public twitch: Client;
+    public eventSub: EventSubWebSocket;
+    public twitch: TwitchAPI;
     public commands: Map<string, ICommand>;
     public dynamicCommands: Map<string, DynamicCommand>;
     public timers: Map<string, Timer>;
     private runningTimers: Map<string, ReturnType<typeof setInterval>>;
     public state: BotState;
+    private _broadcasterUserId: string;
+    private _botUserId: string;
 
-    constructor(accessToken: string, username?: string) {
-        const botUsername = username || Bun.env.TWITCH_USERNAME;
+    public get broadcasterId(): string {
+        return this._broadcasterUserId;
+    }
 
-        this.twitch = new Client({
-            options: {
-                debug: Bun.env.NODE_ENV === 'development',
-                clientId: Bun.env.TWITCH_CLIENT_ID,
-            },
-            identity: {
-                username: botUsername,
-                password: `oauth:${accessToken}`,
-            },
-            channels: [Bun.env.TWITCH_CHANNEL]
-        });
+    public get botId(): string {
+        return this._botUserId;
+    }
+
+    constructor(broadcasterUserId: string, botUserId: string) {
+        this._broadcasterUserId = broadcasterUserId;
+        this._botUserId = botUserId;
+
+        this.eventSub = new EventSubWebSocket();
+        this.twitch = new TwitchAPI(broadcasterUserId, botUserId);
 
         this.commands = new Map();
         this.dynamicCommands = new Map();
@@ -36,22 +41,26 @@ export default class {
             bigWordMessageCount: 0,
             temporaryLink: null
         };
-
-        this.setupEventHandlers();
     }
 
     private setupEventHandlers(): void {
-        this.twitch.on('message', async (channel, userstate, message, self) => {
+        this.eventSub.on('channel.chat.message', async (notification: EventSubNotification) => {
+            const event = notification.event as ChatMessageEvent;
+            const channel = `#${event.broadcaster_user_login}`;
+            const message = event.message.text;
+            const userstate = this.createUserstate(event);
+
             server.publish('chat', JSON.stringify({ channel, userstate, message }));
 
-            if (self || message.startsWith('/')) return;
+            if (event.chatter_user_id === this._botUserId || message.startsWith('/')) return;
+
             const msg = message.toLowerCase();
 
             // Handle big word tracking
             if (this.state.bigWordActive) {
                 this.state.bigWordMessageCount++;
                 if (this.state.bigWordMessageCount === 7) {
-                    this.state.bigWord ? this.twitch.say(channel, this.state.bigWord) : null;
+                    this.state.bigWord ? await this.twitch.say(this.state.bigWord) : null;
                     this.state.bigWordMessageCount = 0;
                 }
             }
@@ -63,20 +72,37 @@ export default class {
             // Handle special messages - BW end trigger
             if (msg === ']') {
                 this.unsetBigWord();
-                await this.twitch.say(channel, 'Big Word trigger removed PepeHands');
+                await this.twitch.say('Big Word trigger removed PepeHands');
                 return;
             }
 
             if (msg.includes('bhotiana'))
-                return await this.twitch.say(channel, `@${userstate.username} What!? 👀`);
+                return await this.twitch.say(`@${userstate.user_login} What!? 👀`);
 
             // Handle message ending with ',' (repeat without comma)
             if (msg.endsWith(',')) {
                 const msgToRepeat = msg.slice(0, -1);
                 if (msgToRepeat.length)
-                    this.twitch.say(channel, msgToRepeat);
+                    await this.twitch.say(msgToRepeat);
             }
         });
+    }
+
+    private createUserstate(event: ChatMessageEvent): ChatUserstate {
+        const isModerator = event.badges.some(b => b.set_id === 'moderator' || b.set_id === 'broadcaster');
+        const isSubscriber = event.badges.some(b => b.set_id === 'subscriber');
+        const isBroadcaster = event.badges.some(b => b.set_id === 'broadcaster');
+
+        return {
+            user_id: event.chatter_user_id,
+            user_login: event.chatter_user_login,
+            user_name: event.chatter_user_name,
+            color: event.color,
+            badges: event.badges,
+            isModerator,
+            isSubscriber,
+            isBroadcaster
+        };
     }
 
     private async handleCommand(channel: string, userstate: ChatUserstate, message: string): Promise<void> {
@@ -99,11 +125,9 @@ export default class {
         }
 
         if (command) {
-            // Check moderator permissions
-            if (command.moderatorOnly && !this.hasModPermissions(channel, userstate))
+            if (command.moderatorOnly && !this.hasModPermissions(userstate))
                 return;
 
-            // Execute command
             try {
                 await command.execute({ channel, userstate, message, args }, this);
             }
@@ -111,13 +135,11 @@ export default class {
             catch (error) {
                 console.error(`Error executing command ${commandName}:`, error);
 
-                // Provide user feedback for command errors
                 if (error instanceof Error) {
                     if (Bun.env.NODE_ENV === 'development')
-                        await this.twitch.say(channel, `[DEV ERROR]: ${commandName} - ${error.message}`);
-
+                        await this.twitch.say(`[DEV ERROR]: ${commandName} - ${error.message}`);
                     else
-                        await this.twitch.say(channel, `[ERROR]: Command ${commandName} failed to execute.`);
+                        await this.twitch.say(`[ERROR]: Command ${commandName} failed to execute.`);
                 }
             }
             return;
@@ -137,10 +159,8 @@ export default class {
         }
     }
 
-    public hasModPermissions(channel: string, userstate: ChatUserstate): boolean {
-        return userstate.mod ||
-            userstate['user-type'] === 'mod' ||
-            userstate.username === channel.slice(1);
+    public hasModPermissions(userstate: ChatUserstate): boolean {
+        return userstate.isModerator || userstate.isBroadcaster;
     }
 
     public async initializeState(): Promise<void> {
@@ -185,21 +205,77 @@ export default class {
             await this.loadDynamicCommands();
             await this.loadTimers();
 
-            // Add error event handlers
-            this.twitch.on('disconnected', (reason) => {
-                console.error('🔥 Bot disconnected:', reason);
-            });
+            await this.eventSub.connect();
+            this.setupEventHandlers();
+            await this.subscribeToEvents();
 
-            this.twitch.on('notice', (channel, msgid, message) => {
-                console.error('🔥 Notice:', msgid, message);
-            });
-
-            await this.twitch.connect();
-            console.log('🤖 Bot connected to Twitch!');
+            console.log('🤖 Bot connected to Twitch EventSub!');
         }
 
         catch (error) {
             console.error('🔥 Failed to connect bot:', error);
+            throw error;
+        }
+    }
+
+    private async subscribeToEvents(): Promise<void> {
+        const sessionId = this.eventSub.getSessionId();
+        if (!sessionId) {
+            throw new Error('No EventSub session ID available');
+        }
+
+        try {
+            // Updated: Assign this session to the Conduit first
+            const conduitResponse = await fetch(`${server.url}api/conduit/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+
+            if (!conduitResponse.ok) {
+                const errText = await conduitResponse.text();
+                console.error('Failed to update conduit shard:', errText);
+                throw new Error(`Conduit Update Failed: ${errText}`);
+            }
+
+            console.log('🔗 Conduit Shard Assigned. Subscribing using Conduit...');
+
+            const response = await fetch(`${server.url}api/eventsub/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'channel.chat.message',
+                    version: '1',
+                    condition: {
+                        broadcaster_user_id: this._broadcasterUserId,
+                        user_id: this._botUserId
+                    }
+                    // Transport is now handled by the server (added as conduit)
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 409) {
+                    console.log('✅ Subscription already exists (Conduit persistent)');
+                    return;
+                }
+
+                // Try to parse JSON, fallback to text
+                let errorDetails;
+                try {
+                    errorDetails = await response.json();
+                } catch {
+                    errorDetails = await response.text();
+                }
+                console.error('Failed to subscribe to channel.chat.message:', errorDetails);
+                throw new Error(`Failed to subscribe: ${JSON.stringify(errorDetails)}`);
+            }
+
+            console.log('✅ Subscribed to channel.chat.message');
+        } catch (error) {
+            console.error('Error subscribing to events:', error);
+            // Critical: Close the socket to prevent infinite reconnect loop if subscription fails
+            this.eventSub.close();
             throw error;
         }
     }
@@ -226,16 +302,15 @@ export default class {
     private async executeDynamicCommand(channel: string, userstate: ChatUserstate, args: string[], dynamicCommand: DynamicCommand): Promise<void> {
         let response = dynamicCommand.response;
 
-        // Simple variable substitution
-        response = response.replace(/\{user\}/g, userstate.username || 'Unknown');
-        response = response.replace(/\{channel\}/g, channel.slice(1)); // Remove # from channel name
+        response = response.replace(/\{user\}/g, userstate.user_login);
+        response = response.replace(/\{channel\}/g, channel.slice(1));
 
         // If args are provided, replace {1}, {2}, etc.
         args.forEach((arg, index) => {
             response = response.replace(new RegExp(`\\{${index + 1}\\}`, 'g'), arg);
         });
 
-        await this.twitch.say(channel, response);
+        await this.twitch.say(response);
     }
 
     public async loadDynamicCommands(): Promise<void> {
@@ -391,12 +466,11 @@ export default class {
     }
 
     private startTimer(timer: Timer): void {
-        this.stopTimer(timer.name); // Ensure no duplicate intervals
+        this.stopTimer(timer.name);
 
         const intervalMs = timer.interval * 60 * 1000;
         const intervalId = setInterval(() => {
-            const channel = Bun.env.TWITCH_CHANNEL;
-            this.twitch.say(channel, timer.message);
+            this.twitch.say(timer.message);
         }, intervalMs);
 
         this.runningTimers.set(timer.name, intervalId);
@@ -415,7 +489,7 @@ export default class {
         const validInterval = Math.max(1, Math.min(1440, Math.floor(interval)));
 
         if (this.timers.has(name)) {
-            return false; // Timer already exists
+            return false;
         }
 
         try {
@@ -484,7 +558,6 @@ export default class {
             timer.interval = validInterval;
 
             if (timer.enabled) {
-                // Restart to apply new interval
                 this.startTimer(timer);
             }
 

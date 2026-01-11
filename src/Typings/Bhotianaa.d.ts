@@ -1,18 +1,5 @@
 import type { TwitchUser } from "./TwitchAPI";
-
-export interface Scopes {
-    broadcaster: string[];
-    app: string[];
-}
-
-interface whoamiBase extends TwitchUser {
-    token: string;
-}
-
-export interface whoamiData {
-    app: whoamiBase;
-    broadcaster: whoamiBase;
-}
+import type { ChatUserstate } from "./EventSub.d";
 
 export interface BotState {
     bigWord: string | null;
@@ -33,7 +20,7 @@ export interface ICommand {
     description: string;
     aliases?: string[];
     moderatorOnly?: boolean;
-    execute(context: CommandContext, client: Bhotianaa): Promise<void> | void;
+    execute(context: CommandContext, client: any): Promise<void> | void;
 }
 
 export interface DynamicCommand {

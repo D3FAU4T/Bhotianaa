@@ -10,12 +10,12 @@ export default <ICommand> {
         const [goalStr, numsStr] = context.args.join(" ").split(';');
 
         if (!goalStr || !numsStr)
-            return client.twitch.say(context.channel, "Usage: !numble <target>; <num1> <num2> <num3>...");
+            return client.twitch.say("Usage: !numble <target>; <num1> <num2> <num3>...");
 
         // Parse target number
         const target = parseFloat(goalStr.trim());
         if (isNaN(target))
-            return client.twitch.say(context.channel, "❌ Invalid target number. Please provide a valid number.");
+            return client.twitch.say("❌ Invalid target number. Please provide a valid number.");
 
         // Parse numbers array
         const numberStrings = numsStr.trim().split(/\s+/);
@@ -25,28 +25,28 @@ export default <ICommand> {
             const num = parseFloat(numStr);
 
             if (isNaN(num))
-                return client.twitch.say(context.channel, `❌ Invalid number: "${numStr}". Please provide valid numbers.`);
+                return client.twitch.say(`❌ Invalid number: \"${numStr}\". Please provide valid numbers.`);
             
             numbers.push(num);
         }
 
         if (numbers.length < 2)
-            return client.twitch.say(context.channel, "❌ Please provide at least 2 numbers to work with.");
+            return client.twitch.say("❌ Please provide at least 2 numbers to work with.");
 
         try {
             const initialExprs: readonly string[] = numbers.map(n => n.toString());
             const solution = findMathExpression(numbers, initialExprs, target);
 
             if (solution)
-                client.twitch.say(context.channel, `🎉 Found it: ${solution} = ${target}`);
+                client.twitch.say(`🎉 Found it: ${solution} = ${target}`);
             
             else
-                client.twitch.say(context.channel, `😕 No solution found`);
+                client.twitch.say(`😕 No solution found`);
         }
         
         catch (error) {
             console.error('Math solver error:', error);
-            client.twitch.say(context.channel, "❌ An error occurred while solving. Please try again.");
+            client.twitch.say("❌ An error occurred while solving. Please try again.");
         }
     }
 }

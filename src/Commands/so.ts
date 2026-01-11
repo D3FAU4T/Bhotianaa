@@ -12,7 +12,7 @@ export default <ICommand>{
         const targetChannel = context.args[0]?.toLowerCase().replace('@', '');
 
         if (!targetChannel) {
-            await client.twitch.say(context.channel, 'Usage: !so <channel>');
+            await client.twitch.say('Usage: !so <channel>');
             return;
         }
 
@@ -45,7 +45,6 @@ export default <ICommand>{
         const prefix = game.toLowerCase() === 'just chatting' ? 'just chatting' : `last seen playing ${game}`;
 
         await client.twitch.say(
-            context.channel,
             `Check out @${targetChannel} at https://twitch.tv/${targetChannel} - they were ${prefix}!`
         );
     }

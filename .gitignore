@@ -35,7 +35,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Project specific
 src/Config/tokens.json
-src/Config/whoami.json
 src/Cache/
 src/Config/dynamic-commands.json
 src/Config/timers.json

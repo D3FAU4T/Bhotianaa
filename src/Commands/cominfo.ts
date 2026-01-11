@@ -5,17 +5,17 @@ export default <ICommand>{
     name: 'cominfo',
     description: 'Show information about a dynamic command',
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { channel, userstate, args } = context;
+        const { userstate, args } = context;
 
         if (args.length < 1) {
-            await client.twitch.say(channel, `@${userstate.username} Usage: !cominfo <!commandName>`);
+            await client.twitch.say(`@${userstate.user_name} Usage: !cominfo <!commandName>`);
             return;
         }
 
         let commandName = args[0];
 
         if (!commandName) {
-            await client.twitch.say(channel, `@${userstate.username} Invalid command name.`);
+            await client.twitch.say(`@${userstate.user_name} Invalid command name.`);
             return;
         }
 
@@ -26,13 +26,13 @@ export default <ICommand>{
         // Check if it's a hard-coded command
         if (client.commands.has(commandName)) {
             const command = client.commands.get(commandName)!;
-            await client.twitch.say(channel, `@${userstate.username} !${commandName} is a hard-coded command. Description: ${command.description}`);
+            await client.twitch.say(`@${userstate.user_name} !${commandName} is a hard-coded command. Description: ${command.description}`);
             return;
         }
 
         // Check if dynamic command exists
         if (!client.dynamicCommands.has(commandName)) {
-            await client.twitch.say(channel, `@${userstate.username} Command !${commandName} does not exist.`);
+            await client.twitch.say(`@${userstate.user_name} Command !${commandName} does not exist.`);
             return;
         }
 
@@ -43,6 +43,6 @@ export default <ICommand>{
         const year = date.getFullYear();
         const createdDate = `${day} ${month} ${year}`;
 
-        await client.twitch.say(channel, `@${userstate.username} !${commandName} - Created by ${dynamicCommand.createdBy} on ${createdDate}. Response: ${dynamicCommand.response}`);
+        await client.twitch.say(`@${userstate.user_name} !${commandName} - Created by ${dynamicCommand.createdBy} on ${createdDate}. Response: ${dynamicCommand.response}`);
     }
 };

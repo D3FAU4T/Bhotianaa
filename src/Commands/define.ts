@@ -10,7 +10,7 @@ export default <ICommand> {
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const word = context.args.join(' ');
         if (!word) {
-            await client.twitch.say(context.channel, 'Usage: !def <word>');
+            await client.twitch.say('Usage: !def <word>');
             return;
         }
 
@@ -18,14 +18,14 @@ export default <ICommand> {
         const result = await response.json() as dictionaryAPI[];
         
         if (!Array.isArray(result)) {
-            await client.twitch.say(context.channel, `Oh no, I don't know the definition of ${word}, Mamma help D:`);
+            await client.twitch.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
             return;
         }
 
         if (result[0] && result[0].meanings[0] && result[0].meanings[0].definitions[0])
-            await client.twitch.say(context.channel, `${word}: ${result[0].meanings[0].definitions[0].definition}`);
+            await client.twitch.say(`${word}: ${result[0].meanings[0].definitions[0].definition}`);
 
         else
-            await client.twitch.say(context.channel, `Oh no, I don't know the definition of ${word}, Mamma help D:`);
+            await client.twitch.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
     }
 };

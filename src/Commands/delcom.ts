@@ -6,17 +6,17 @@ export default <ICommand>{
     description: 'Delete a dynamic command (Mods/Broadcaster only)',
     moderatorOnly: true,
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { channel, userstate, args } = context;
+        const { userstate, args } = context;
 
         if (args.length < 1) {
-            await client.twitch.say(channel, `@${userstate.username} Usage: !delcom <!commandName>`);
+            await client.twitch.say(`@${userstate.user_name} Usage: !delcom <!commandName>`);
             return;
         }
 
         let commandName = args[0];
 
         if (!commandName) {
-            await client.twitch.say(channel, `@${userstate.username} Invalid command name.`);
+            await client.twitch.say(`@${userstate.user_name} Invalid command name.`);
             return;
         }
 
@@ -26,13 +26,13 @@ export default <ICommand>{
 
         // Check if it's a hard-coded command (cannot be deleted)
         if (client.commands.has(commandName)) {
-            await client.twitch.say(channel, `@${userstate.username} Cannot delete hard-coded command !${commandName}.`);
+            await client.twitch.say(`@${userstate.user_name} Cannot delete hard-coded command !${commandName}.`);
             return;
         }
 
         // Check if dynamic command exists
         if (!client.dynamicCommands.has(commandName)) {
-            await client.twitch.say(channel, `@${userstate.username} Dynamic command !${commandName} does not exist.`);
+            await client.twitch.say(`@${userstate.user_name} Dynamic command !${commandName} does not exist.`);
             return;
         }
 
@@ -40,9 +40,9 @@ export default <ICommand>{
         const success = await client.removeDynamicCommand(commandName);
 
         if (success)
-            await client.twitch.say(channel, `@${userstate.username} Command !${commandName} has been deleted successfully! VoHiYo`);
+            await client.twitch.say(`@${userstate.user_name} Command !${commandName} has been deleted successfully! VoHiYo`);
         
         else
-            await client.twitch.say(channel, `@${userstate.username} Failed to delete command !${commandName}. Please try again.`);
+            await client.twitch.say(`@${userstate.user_name} Failed to delete command !${commandName}. Please try again.`);
     }
 };

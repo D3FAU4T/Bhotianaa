@@ -7,17 +7,32 @@ type Props = {
     ws: WebSocket | null;
 }
 
-// Twitch badge URLs from their CDN
-const BADGE_URLS: Record<string, string> = {
-    broadcaster: 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
-    moderator: 'https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1',
-    vip: 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1',
-    premium: 'https://static-cdn.jtvnw.net/badges/v1/bbbe0db0-a598-423e-86d0-f9fb98ca1933/1',
-    turbo: 'https://static-cdn.jtvnw.net/badges/v1/bd444ec6-8f34-4bf9-91f4-af1e3428d80f/1',
-    partner: 'https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/1',
-    staff: 'https://static-cdn.jtvnw.net/badges/v1/d97c37bd-a6f5-4c38-8f57-4e4bef88af34/1',
-    admin: 'https://static-cdn.jtvnw.net/badges/v1/9ef7e029-4cdf-4d4d-a0d5-e2b3fb2583fe/1',
-    global_mod: 'https://static-cdn.jtvnw.net/badges/v1/9384c43e-4ce7-4e94-b2a1-b93656896eba/1',
+// Dynamic badge URL builder - constructs badge URLs from set_id and version id
+const getBadgeUrl = (setId: string, versionId: string): string | null => {
+    // Map of set_id to badge UUID patterns
+    const badgeUuids: Record<string, string> = {
+        'broadcaster': '5527c58c-fb7d-422d-b71b-f309dcb85cc1',
+        'moderator': '3267646d-33f0-4b17-b3df-f923a41db1d0',
+        'lead_moderator': '0822047b-65e0-46f2-94a9-d1091d685d33',
+        'vip': 'b817aba4-fad8-49e2-b88a-7cc744dfa6ec',
+        'premium': 'bbbe0db0-a598-423e-86d0-f9fb98ca1933',
+        'turbo': 'bd444ec6-8f34-4bf9-91f4-af1e3428d80f',
+        'partner': 'd12a2e27-16f6-41d0-ab77-b780518f00a3',
+        'staff': 'd97c37bd-a6f5-4c38-8f57-4e4bef88af34',
+        'admin': '9ef7e029-4cdf-4d4d-a0d5-e2b3fb2583fe',
+        'global_mod': '9384c43e-4ce7-4e94-b2a1-b93656896eba',
+        'glhf-pledge': '3158e758-3cb4-43c5-94b3-7639810451c5',
+        'no_audio': 'aef2cd08-f29b-45a1-8c12-d44d7fd5e6f0',
+        'bot-badge': '3ffa9565-c35b-4cad-800b-041e60659cf2'
+    };
+
+    const uuid = badgeUuids[setId];
+    if (uuid) {
+        return `https://static-cdn.jtvnw.net/badges/v1/${uuid}/${versionId}`;
+    }
+
+    // Return null for unknown badges (subscriber, etc.)
+    return null;
 };
 
 const Chatbox = ({ messages, ws }: Props) => {
@@ -77,21 +92,27 @@ const Chatbox = ({ messages, ws }: Props) => {
 
     // Render badges from userstate
     const renderBadges = (userstate: any) => {
-        if (!userstate.badges) return null;
+        if (!userstate.badges || !Array.isArray(userstate.badges)) return null;
 
         const badges = [];
 
-        // Badges come as an object like { broadcaster: '1', moderator: '1', subscriber: '12' }
-        for (const [badgeName, badgeVersion] of Object.entries(userstate.badges)) {
-            const badgeUrl = BADGE_URLS[badgeName];
+        // EventSub badges come as an array of objects: [{ set_id: 'broadcaster', id: '1', info: '' }, ...]
+        for (const badge of userstate.badges) {
+            const badgeName = badge.set_id;
+            const badgeId = badge.id;
+            
+            // Debug log to see what set_id we're receiving
+            console.log(`Badge received - set_id: ${badgeName}, id: ${badgeId}, info: ${badge.info}`);
+            
+            const badgeUrl = getBadgeUrl(badgeName, badgeId);
 
             if (badgeUrl) {
                 badges.push(
                     <img
-                        key={badgeName}
+                        key={`${badgeName}-${badgeId}`}
                         src={badgeUrl}
                         alt={badgeName}
-                        title={badgeName.charAt(0).toUpperCase() + badgeName.slice(1)}
+                        title={badgeName.charAt(0).toUpperCase() + badgeName.slice(1).replace('_', ' ')}
                         style={{
                             width: '18px',
                             height: '18px',
@@ -102,11 +123,11 @@ const Chatbox = ({ messages, ws }: Props) => {
                     />
                 );
             } else if (badgeName === 'subscriber') {
-                // For subscriber badges, show a generic subscriber icon
+                // For subscriber badges, show a generic subscriber icon with months
                 badges.push(
                     <span
-                        key={badgeName}
-                        title={`Subscriber (${badgeVersion} months)`}
+                        key={`${badgeName}-${badgeId}`}
+                        title={`Subscriber (${badgeId} months)`}
                         style={{
                             display: 'inline-block',
                             width: '18px',
@@ -125,6 +146,9 @@ const Chatbox = ({ messages, ws }: Props) => {
                         ★
                     </span>
                 );
+            } else {
+                // Log unknown badges so we can add them later
+                console.warn(`Unknown badge set_id: ${badgeName} with id: ${badgeId}`);
             }
         }
 
@@ -217,10 +241,10 @@ const Chatbox = ({ messages, ws }: Props) => {
                             <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
                                 {renderBadges(msg.userstate)}
                                 <strong style={{ color: msg.userstate.color, marginRight: '4px' }}>
-                                    {msg.userstate.username}:
+                                    {msg.userstate.user_name}:
                                 </strong>
                                 <span style={{ wordBreak: 'break-word', flex: 1 }}>
-                                    {parseMessage(msg.message, msg.userstate.emotes)}
+                                    {parseMessage(msg.message, {})}
                                 </span>
                             </div>
                         </>

@@ -1,6 +1,3 @@
-import path from 'node:path';
-import type { whoamiData } from '../Typings/Bhotianaa';
-
 interface Operation {
     readonly result: number;
     readonly expression: string;
@@ -64,14 +61,24 @@ export function findMathExpression(nums: readonly number[], exprs: readonly stri
 // Helper function to fetch stream info
 export const fetchStreamInfo = async () => {
     try {
-        const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
-        const authData = await tokenFile.json() as whoamiData;
-        const channelId = Bun.env.TWITCH_CHANNEL_ID;
+        const { readTokensSafe } = await import('./RouteFunctions');
+        const tokens = await readTokensSafe();
+
+        if (!tokens.broadcaster?.access_token || !tokens.broadcaster?.user_id) {
+            return {
+                title: 'Offline (Auth Missing)',
+                gameName: 'Not Playing',
+                gameArt: '',
+                channelName: 'Unknown'
+            };
+        }
+
+        const channelId = tokens.broadcaster.user_id;
 
         // Get channel info
         const channelResponse = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${channelId}`, {
             headers: {
-                'Authorization': `Bearer ${authData.broadcaster.token}`,
+                'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
                 'Client-Id': Bun.env.TWITCH_CLIENT_ID!
             }
         });
@@ -83,18 +90,28 @@ export const fetchStreamInfo = async () => {
                 title: 'Stream Offline',
                 gameName: 'Not Playing',
                 gameArt: '',
-                channelName: Bun.env.TWITCH_CHANNEL
+                channelName: 'Channel'
             };
         }
 
         const channel = channelData.data[0];
+
+        // Check if stream is live
+        const streamResponse = await fetch(`https://api.twitch.tv/helix/streams?user_id=${channelId}`, {
+            headers: {
+                'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
+                'Client-Id': Bun.env.TWITCH_CLIENT_ID!
+            }
+        });
+        const streamData = await streamResponse.json();
+        const isLive = streamData.data && streamData.data.length > 0;
 
         // Get game artwork if game_id exists
         let gameArt = '';
         if (channel?.game_id) {
             const gameResponse = await fetch(`https://api.twitch.tv/helix/games?id=${channel.game_id}`, {
                 headers: {
-                    'Authorization': `Bearer ${authData.broadcaster.token}`,
+                    'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
                     'Client-Id': Bun.env.TWITCH_CLIENT_ID!
                 }
             });
@@ -105,9 +122,11 @@ export const fetchStreamInfo = async () => {
         }
 
         return {
-            title: channel?.title || 'No Title',
-            gameName: channel?.game_name || 'Not Playing',
-            gameArt: gameArt
+            title: isLive ? channel?.title : 'Offline',
+            gameName: isLive ? channel?.game_name : 'Offline',
+            gameArt: gameArt,
+            channelName: channel?.broadcaster_name || 'Unknown',
+            isLive
         };
     } catch (error) {
         console.error('Error fetching stream info:', error);
@@ -115,7 +134,7 @@ export const fetchStreamInfo = async () => {
             title: 'Error',
             gameName: 'Error',
             gameArt: '',
-            channelName: Bun.env.TWITCH_CHANNEL
+            channelName: 'Error'
         };
     }
 };

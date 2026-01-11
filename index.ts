@@ -1,14 +1,12 @@
-import path from 'node:path';
 import { serve } from 'bun';
-import type { TwitchAuth } from './src/Typings/TwitchAPI';
-import type { whoamiData } from './src/Typings/Bhotianaa';
 import {
-    handleAuth,
-    handleAuthCallback,
-    handleAuthRegister,
-    handleAuthValidate,
+    handleLogin,
+    handleCallback,
+    handleValidate,
+    handleChatSend,
     handleClips,
     handleDefine,
+    handleEventSubSubscribe,
     handleShoutout,
     handleTwitchAnnouncements,
     handleTwitchChannelsGet,
@@ -16,14 +14,14 @@ import {
     handleTwitchGames,
     handleTwitchUsers,
     handleUptime,
-    handleWhoami
+    handleWhoami,
+    readTokensSafe,
+    updateConduitShard
 } from './src/Core/RouteFunctions';
 
 import dashboardView from './src/Views/dashboard.html';
 import clipsView from './src/Views/clips.html';
 import { fetchStreamInfo } from './src/Core/Functions';
-
-const tokenFile = Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
 let twitchClient: InstanceType<typeof import('./src/Core/Client').default> | null = null;
 
@@ -32,10 +30,12 @@ export const server = serve({
     development: Bun.env.NODE_ENV === 'development',
     routes: {
         '/': dashboardView,
-        '/auth/:authtype': handleAuth,
-        '/auth/callback': handleAuthCallback,
-        '/auth/register': handleAuthRegister,
-        '/auth/validate': handleAuthValidate,
+        '/auth/login/:type': handleLogin,
+        '/auth/callback': handleCallback,
+        '/auth/validate': handleValidate,
+        '/api/conduit/update': { POST: updateConduitShard },
+        '/api/chat/send': handleChatSend,
+        '/api/eventsub/subscribe': handleEventSubSubscribe,
         "/define/:word": handleDefine,
         "/whoami": handleWhoami,
         "/twitch/users": handleTwitchUsers,
@@ -81,8 +81,7 @@ export const server = serve({
 
             if (ws.data.room === 'chat') {
                 if (twitchClient && data.message) {
-                    const channel = Bun.env.TWITCH_CHANNEL;
-                    twitchClient.twitch.say(channel, data.message);
+                    twitchClient.twitch.say(data.message);
                 }
             }
 
@@ -247,33 +246,37 @@ export const server = serve({
 
 console.log(`Local server running on ${server.url}\nTo terminate the app, press Ctrl+C\n`);
 
-if (!await tokenFile.exists() || !(await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>).app)
-    console.warn(`⚠️  No app tokens found. Please authenticate first by visiting ${server.url}auth/app ❗ USING BOT ACCOUNT ❗`);
+// Initialize Bot
+const initBot = async () => {
+    const tokens = await readTokensSafe();
 
-else {
-    let tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
-
-    if (!tokens.broadcaster) {
-        console.warn(`⚠️  No broadcaster tokens found. Please authenticate first by visiting ${server.url}auth/broadcaster ❗ USING BROADCASTER ACCOUNT ❗`);
-    }
-
-    else {
-        const whoamiFile = Bun.file(path.resolve('src', 'Config', 'whoami.json'));
-
+    if (tokens.broadcaster && tokens.bot) {
         await fetch(server.url + 'auth/validate');
 
-        // Refresh whoami data to ensure we have the latest user info
-        await fetch(server.url + '/whoami');
+        setInterval(() => fetch(server.url + 'auth/validate'), 3600000);
 
-        // Read the updated tokens after validation
-        tokens = await tokenFile.json() as Record<'app' | 'broadcaster', TwitchAuth | null>;
+        const broadcasterUserId = tokens.broadcaster.user_id;
+        const botUserId = tokens.bot.user_id;
 
-        // Get the app user's login name for the bot
-        const whoamiData = await whoamiFile.json() as whoamiData;
-        const botUsername = whoamiData.app.login;
-
-        setInterval(() => fetch(server.url + '/auth/validate'), 3600000); // Validate tokens every hour
-        twitchClient = new (await import('./src/Core/Client')).default(tokens.app!.access_token, botUsername);
-        await twitchClient.connect();
+        if (broadcasterUserId && botUserId) {
+            console.log(`🤖 Starting bot... (Broadcaster: ${broadcasterUserId}, Bot: ${botUserId})`);
+            twitchClient = new (await import('./src/Core/Client')).default(
+                broadcasterUserId,
+                botUserId
+            );
+            await twitchClient.connect();
+        } else {
+            console.warn('⚠️  Tokens found but User IDs missing. Please re-login.');
+        }
+    } else {
+        console.warn(`⚠️  Bot not fully configured.`);
+        if (!tokens.broadcaster)
+            console.warn(`   👉 Visit ${server.url}auth/login/broadcaster to authenticate Broadcaster Account.`);
+        if (!tokens.bot)
+            console.warn(`   👉 Visit ${server.url}auth/login/bot to authenticate Bot Account.`);
     }
 }
+
+initBot().catch(error => {
+    console.error('Failed to initialize bot:', error);
+});
