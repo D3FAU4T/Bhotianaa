@@ -138,3 +138,36 @@ export const fetchStreamInfo = async () => {
         };
     }
 };
+
+export const checkUpdates = async (): Promise<void> => {
+    try {
+        console.log('🔍 Checking for updates...');
+
+        // Fetch latest from remote
+        const fetchProc = Bun.spawn(['git', 'fetch']);
+        await fetchProc.exited;
+
+        if (fetchProc.exitCode !== 0) {
+            console.warn('⚠️ Failed to fetch updates from git remote.');
+            return;
+        }
+
+        // Check if behind
+        // We assume 'main' is the branch. 
+        const statusProc = Bun.spawn(['git', 'rev-list', '--count', 'HEAD..origin/main']);
+        const text = await new Response(statusProc.stdout).text();
+        await statusProc.exited;
+
+        const behindCount = parseInt(text.trim());
+
+        if (!isNaN(behindCount) && behindCount > 0) {
+            console.log(`\n📢 \x1b[32mUPDATE AVAILABLE\x1b[0m: You are behind by ${behindCount} commits.`);
+            console.log(`   👉 Run \x1b[36mbun run update\x1b[0m or \x1b[36m./Update.ps1\x1b[0m to update.\n`);
+        } else {
+            console.log('✅ Bot is up to date.');
+        }
+
+    } catch (error) {
+        console.error('Failed to check for updates:', error);
+    }
+};

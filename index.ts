@@ -21,7 +21,7 @@ import {
 
 import dashboardView from './src/Views/dashboard.html';
 import clipsView from './src/Views/clips.html';
-import { fetchStreamInfo } from './src/Core/Functions';
+import { fetchStreamInfo, checkUpdates } from './src/Core/Functions';
 
 let twitchClient: InstanceType<typeof import('./src/Core/Client').default> | null = null;
 
@@ -248,6 +248,7 @@ console.log(`Local server running on ${server.url}\nTo terminate the app, press 
 
 // Initialize Bot
 const initBot = async () => {
+    await checkUpdates();
     const tokens = await readTokensSafe();
 
     if (tokens.broadcaster && tokens.bot) {
