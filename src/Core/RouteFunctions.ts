@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { CSRF, type BunRequest } from 'bun';
 import type { TwitchAuth, TwitchUser } from '../Typings/TwitchAPI';
+import { events } from './Events';
 
 const getTokenFile = () => Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
@@ -74,6 +75,21 @@ export const handleLogin = async (req: BunRequest<'/auth/login/:type'>) => {
     return new Response(null, { status: 302, headers });
 };
 
+export const handleDisconnect = async (req: BunRequest<'/auth/disconnect/:type'>) => {
+    const { type } = req.params;
+    if (type !== 'broadcaster' && type !== 'bot') {
+        return new Response('Invalid disconnect type. Use /auth/disconnect/broadcaster or /auth/disconnect/bot', { status: 400 });
+    }
+
+    const tokens = await readTokensSafe();
+    tokens[type] = null;
+    await saveTokens(tokens);
+
+    events.emit('auth:update'); // Notify app to reload
+
+    return new Response(`${type === 'broadcaster' ? 'Broadcaster' : 'Bot'} disconnected successfully.`);
+};
+
 export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
@@ -123,7 +139,10 @@ export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
     }
 
     await saveTokens(currentTokens);
-    return new Response(`${type === 'broadcaster' ? 'Broadcaster' : 'Bot'} authentication successful! You can close this window.`);
+
+    events.emit('auth:update'); // Notify app to reload
+
+    return Response.redirect('/');
 };
 
 export const getAppToken = async (): Promise<TwitchAuth | null> => {

@@ -13,7 +13,27 @@ export const fetchStreamInfo = async () => {
             };
         }
 
-        const channelId = tokens.broadcaster.user_id;
+        let channelId = tokens.broadcaster.user_id;
+
+        // DEVELOPER MODE: Override channel ID if DEV_CHANNEL is set
+        if (Bun.env.DEV_CHANNEL) {
+            try {
+                const userRes = await fetch(`https://api.twitch.tv/helix/users?login=${Bun.env.DEV_CHANNEL}`, {
+                    headers: {
+                        'Authorization': `Bearer ${tokens.broadcaster.access_token}`, // fallback to broadcaster token
+                        'Client-Id': Bun.env.TWITCH_CLIENT_ID!
+                    }
+                });
+                if (userRes.ok) {
+                    const userData = await userRes.json();
+                    if (userData.data?.[0]?.id) {
+                        channelId = userData.data[0].id;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to resolve DEV_CHANNEL in fetchStreamInfo", e);
+            }
+        }
 
         // Get channel info
         const channelResponse = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${channelId}`, {

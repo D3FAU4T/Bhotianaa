@@ -20,6 +20,7 @@ export interface ICommand {
     description: string;
     aliases?: string[];
     moderatorOnly?: boolean;
+    streamerOnly?: boolean;
     execute(context: CommandContext, client: any): Promise<void> | void;
 }
 
