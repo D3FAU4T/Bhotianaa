@@ -1,6 +1,7 @@
 import { serve } from 'bun';
 import {
     handleLogin,
+    handleDisconnect,
     handleCallback,
     handleValidate,
     handleChatSend,
@@ -18,6 +19,7 @@ import {
     readTokensSafe,
     updateConduitShard
 } from './src/Core/RouteFunctions';
+import { events } from './src/Core/Events';
 
 import dashboardView from './src/Views/dashboard.html';
 import clipsView from './src/Views/clips.html';
@@ -31,6 +33,7 @@ export const server = serve({
     routes: {
         '/': dashboardView,
         '/auth/login/:type': handleLogin,
+        '/auth/disconnect/:type': { POST: handleDisconnect },
         '/auth/callback': handleCallback,
         '/auth/validate': handleValidate,
         '/api/conduit/update': { POST: updateConduitShard },
@@ -248,26 +251,25 @@ console.log(`Local server running on ${server.url}\nTo terminate the app, press 
 
 // Initialize Bot
 const initBot = async () => {
-    await checkUpdates();
+    // Stop existing instance if any
+    if (twitchClient) {
+        twitchClient.stop();
+        twitchClient = null;
+    }
+
     const tokens = await readTokensSafe();
 
-    if (tokens.broadcaster && tokens.bot) {
-        await fetch(server.url + 'auth/validate');
+    if (tokens.broadcaster && tokens.bot && tokens.broadcaster.user_id && tokens.bot.user_id) {
+        console.log(`🤖 Starting bot... (Broadcaster: ${tokens.broadcaster.user_id}, Bot: ${tokens.bot.user_id})`);
 
-        setInterval(() => fetch(server.url + 'auth/validate'), 3600000);
-
-        const broadcasterUserId = tokens.broadcaster.user_id;
-        const botUserId = tokens.bot.user_id;
-
-        if (broadcasterUserId && botUserId) {
-            console.log(`🤖 Starting bot... (Broadcaster: ${broadcasterUserId}, Bot: ${botUserId})`);
+        try {
             twitchClient = new (await import('./src/Core/Client')).default(
-                broadcasterUserId,
-                botUserId
+                tokens.broadcaster.user_id,
+                tokens.bot.user_id
             );
             await twitchClient.connect();
-        } else {
-            console.warn('⚠️  Tokens found but User IDs missing. Please re-login.');
+        } catch (e) {
+            console.error('Failed to connect bot:', e);
         }
     } else {
         console.warn(`⚠️  Bot not fully configured.`);
@@ -278,7 +280,26 @@ const initBot = async () => {
     }
 }
 
-initBot().catch(error => {
-    console.error('Failed to initialize bot:', error);
+// Start Server & Bot
+const start = async () => {
+    await checkUpdates();
+
+    // Start token validation loop (every hour)
+    setInterval(() => fetch(server.url + 'auth/validate'), 3600000);
+    // Initial validation
+    fetch(server.url + 'auth/validate');
+
+    // Initialize Bot
+    await initBot();
+
+    // Listen for Auth Updates
+    events.on('auth:update', () => {
+        console.log('🔄 Auth update detected. Restarting bot...');
+        initBot();
+    });
+};
+
+start().catch(error => {
+    console.error('Failed to initialize application:', error);
     process.exit(1);
 });

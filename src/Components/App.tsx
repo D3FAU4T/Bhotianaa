@@ -62,7 +62,7 @@ const App = () => {
             case 'timers':
                 return <TimersView timers={timers} ws={commandsWs.current} />;
             case 'accounts':
-                return <AccountsView accounts={accounts} />;
+                return <AccountsView accounts={accounts} onRefresh={fetchAccounts} />;
             default:
                 return (
                     <div style={{ padding: '2rem' }}>

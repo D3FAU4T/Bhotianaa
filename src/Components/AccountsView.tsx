@@ -4,9 +4,21 @@ import youtubeLogo from '../Assets/youtube_social_icon_red.png';
 
 interface AccountsViewProps {
     accounts: { broadcaster: { id: string } | null, bot: { id: string } | null } | null;
+    onRefresh: () => void;
 }
 
-const AccountsView = ({ accounts }: AccountsViewProps) => {
+const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
+    const handleDisconnect = async (type: 'broadcaster' | 'bot') => {
+        if (!confirm(`Are you sure you want to disconnect ${type}?`)) return;
+        try {
+            await fetch(`/auth/disconnect/${type}`, { method: 'POST' });
+            onRefresh();
+        } catch (e) {
+            console.error('Failed to disconnect:', e);
+            alert('Failed to disconnect');
+        }
+    };
+
     return (
         <div style={{ padding: '2rem', height: '100%', overflowY: 'auto' }}>
             <h2 style={{ marginBottom: '2rem', textAlign: 'center', fontSize: '2rem' }}>Manage Connections</h2>
@@ -38,42 +50,46 @@ const AccountsView = ({ accounts }: AccountsViewProps) => {
                         <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Twitch Broadcaster</h3>
                         <p style={{ color: '#888' }}>Main channel account for streaming and events.</p>
                     </div>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        backgroundColor: accounts?.broadcaster ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '2rem',
-                        fontSize: '0.9rem',
-                        color: accounts?.broadcaster ? '#66bb6a' : '#888'
-                    }}>
-                        <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: accounts?.broadcaster ? '#66bb6a' : '#888'
-                        }} />
-                        {accounts?.broadcaster ? 'Connected' : 'Not Connected'}
-                    </div>
-                    <a
-                        href="/auth/login/broadcaster"
-                        style={{
-                            display: 'inline-block',
-                            padding: '0.75rem 2rem',
-                            backgroundColor: '#9146ff',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '0.5rem',
-                            fontWeight: '600',
-                            transition: 'transform 0.2s',
-                            cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                        {accounts?.broadcaster ? 'Reconnect Broadcaster' : 'Connect Broadcaster'}
-                    </a>
+                    {accounts?.broadcaster ? (
+                        <button
+                            onClick={() => handleDisconnect('broadcaster')}
+                            style={{
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Disconnect
+                        </button>
+                    ) : (
+                        <a
+                            href="/auth/login/broadcaster"
+                            style={{
+                                display: 'inline-block',
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#9146ff',
+                                color: 'white',
+                                textDecoration: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                transition: 'transform 0.2s',
+                                cursor: 'pointer',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Connect
+                        </a>
+                    )}
                 </div>
 
                 {/* Twitch Bot */}
@@ -96,42 +112,46 @@ const AccountsView = ({ accounts }: AccountsViewProps) => {
                         <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Twitch Bot</h3>
                         <p style={{ color: '#888' }}>Bot account for chat interactions and moderation.</p>
                     </div>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        backgroundColor: accounts?.bot ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '2rem',
-                        fontSize: '0.9rem',
-                        color: accounts?.bot ? '#66bb6a' : '#888'
-                    }}>
-                        <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: accounts?.bot ? '#66bb6a' : '#888'
-                        }} />
-                        {accounts?.bot ? 'Connected' : 'Not Connected'}
-                    </div>
-                    <a
-                        href="/auth/login/bot"
-                        style={{
-                            display: 'inline-block',
-                            padding: '0.75rem 2rem',
-                            backgroundColor: '#9146ff',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '0.5rem',
-                            fontWeight: '600',
-                            transition: 'transform 0.2s',
-                            cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                        {accounts?.bot ? 'Reconnect Bot' : 'Connect Bot'}
-                    </a>
+                    {accounts?.bot ? (
+                        <button
+                            onClick={() => handleDisconnect('bot')}
+                            style={{
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Disconnect
+                        </button>
+                    ) : (
+                        <a
+                            href="/auth/login/bot"
+                            style={{
+                                display: 'inline-block',
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#9146ff',
+                                color: 'white',
+                                textDecoration: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                transition: 'transform 0.2s',
+                                cursor: 'pointer',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Connect
+                        </a>
+                    )}
                 </div>
 
                 {/* Spotify Placeholder */}
