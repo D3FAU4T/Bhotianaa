@@ -6,6 +6,7 @@ export default <ICommand>{
     name: 'settitle',
     description: 'Sets the title of the stream',
     moderatorOnly: true,
+    streamerOnly: true,
     aliases: ['title'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const title = context.args.join(' ');
@@ -24,7 +25,7 @@ export default <ICommand>{
             await client.twitch.say(`Failed to set title: ${response.status} ${response.statusText}`);
             return;
         }
-        
+
         // Personalized response based on user
         if (context.userstate.user_login === 'd3fau4t')
             await client.twitch.say(

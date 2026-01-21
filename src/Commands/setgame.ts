@@ -8,6 +8,7 @@ export default <ICommand> {
     name: 'setgame',
     description: 'Sets the game of the stream',
     moderatorOnly: true,
+    streamerOnly: true,
     aliases: ['game'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const gameInput = context.args.join(' ');
@@ -29,7 +30,7 @@ export default <ICommand> {
         if (!isNaN(gameId)) {
             const response = await fetch(server.url + `twitch/games?id=${gameId}`);
             const data = await response.json() as { data: TwitchGame[] };
-            
+
             if (data.data.length === 0 || !data.data[0]) {
                 await client.twitch.say(`Game with ID "${gameId}" not found.`);
                 return;
@@ -43,7 +44,7 @@ export default <ICommand> {
                 await gamesFile.write(JSON.stringify(gamesCache, null, 2));
             }
         }
-        
+
         // Input is a game name
         else {
             gameElement = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());

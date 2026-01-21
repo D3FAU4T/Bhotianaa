@@ -7,6 +7,7 @@ export default <ICommand>{
     name: 'shoutout',
     description: 'Sends a shoutout to a channel',
     moderatorOnly: true,
+    streamerOnly: true,
     aliases: ['so'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const targetChannel = context.args[0]?.toLowerCase().replace('@', '');

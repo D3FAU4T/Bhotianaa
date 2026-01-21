@@ -8,6 +8,7 @@ export default <ICommand>{
     description: 'Sends a live notification to the discord channel',
     aliases: ['announce'],
     moderatorOnly: true,
+    streamerOnly: true,
     execute: async (context: CommandContext, client: Bhotianaa) => {
         const channelFetch = await fetch(server.url + `twitch/channels?broadcaster_id=${client.broadcasterId}`);
         const channelData = channelFetch.ok ? await channelFetch.json() as { data: TwitchChannel[] } : null;
