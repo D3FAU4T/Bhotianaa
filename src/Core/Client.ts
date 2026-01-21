@@ -86,6 +86,11 @@ export default class {
                     await this.twitch.say(msgToRepeat);
             }
         });
+
+        // Handle Channel Points Redemptions
+        this.eventSub.on('channel.channel_points_custom_reward_redemption.add', (notification) => {
+            console.log('💎 Channel Point Redemption:', JSON.stringify(notification.event, null, 2));
+        });
     }
 
     private createUserstate(event: ChatMessageEvent): ChatUserstate {
@@ -127,6 +132,11 @@ export default class {
         if (command) {
             if (command.moderatorOnly && !this.hasModPermissions(userstate))
                 return;
+
+            if (command.streamerOnly && Bun.env.DEV_CHANNEL) {
+                await this.twitch.say(`@${userstate.user_name} ⚠️ This command is disabled in Developer Mode.`);
+                return;
+            }
 
             try {
                 await command.execute({ channel, userstate, message, args }, this);
@@ -240,6 +250,36 @@ export default class {
 
             console.log('🔗 Conduit Shard Assigned. Subscribing using Conduit...');
 
+            let subscriptionBroadcasterId = this._broadcasterUserId;
+
+            if (Bun.env.DEV_CHANNEL) {
+                try {
+                    const { readTokensSafe } = await import('./RouteFunctions');
+                    const tokens = await readTokensSafe();
+                    if (tokens.app?.access_token) {
+                        const userRes = await fetch(`https://api.twitch.tv/helix/users?login=${Bun.env.DEV_CHANNEL}`, {
+                            headers: {
+                                'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
+                                'Authorization': `Bearer ${tokens.app.access_token}`
+                            }
+                        });
+                        if (userRes.ok) {
+                            const userData = await userRes.json() as { data: { id: string }[] };
+                            if (userData.data?.[0]?.id) {
+                                subscriptionBroadcasterId = userData.data[0].id;
+                                // CRITICAL: Update the client's broadcaster ID and re-instantiate TwitchAPI
+                                // This ensures replies and frontend widgets target the DEV_CHANNEL
+                                this._broadcasterUserId = subscriptionBroadcasterId;
+                                this.twitch = new TwitchAPI(this._broadcasterUserId, this._botUserId);
+                                console.log(`🔧 DEVELOPER MODE: Subscribing to chat of ${Bun.env.DEV_CHANNEL} (ID: ${subscriptionBroadcasterId})`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Check Dev Channel Error:', e);
+                }
+            }
+
             const response = await fetch(`${server.url}api/eventsub/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -247,32 +287,55 @@ export default class {
                     type: 'channel.chat.message',
                     version: '1',
                     condition: {
-                        broadcaster_user_id: this._broadcasterUserId,
+                        broadcaster_user_id: subscriptionBroadcasterId,
                         user_id: this._botUserId
                     }
-                    // Transport is now handled by the server (added as conduit)
                 })
             });
 
             if (!response.ok) {
-                if (response.status === 409) {
+                if (response.status === 409)
                     console.log('✅ Subscription already exists (Conduit persistent)');
-                    return;
-                }
 
-                // Try to parse JSON, fallback to text
-                let errorDetails;
-                try {
-                    errorDetails = await response.json();
-                } catch {
-                    errorDetails = await response.text();
+                else {
+                    let errorDetails;
+                    try { errorDetails = await response.json() }
+                    catch { errorDetails = await response.text() }
+                    console.error('Failed to subscribe to channel.chat.message:', errorDetails);
                 }
-                console.error('Failed to subscribe to channel.chat.message:', errorDetails);
-                throw new Error(`Failed to subscribe: ${JSON.stringify(errorDetails)}`);
             }
 
-            console.log('✅ Subscribed to channel.chat.message');
-        } catch (error) {
+            else console.log('✅ Subscribed to channel.chat.message');
+
+            // Subscribe to Channel Points Redemptions
+            console.log('🔗 Subscribing to channel.channel_points_custom_reward_redemption.add...');
+            const redemptionResponse = await fetch(`${server.url}api/eventsub/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'channel.channel_points_custom_reward_redemption.add',
+                    version: '1',
+                    condition: {
+                        broadcaster_user_id: subscriptionBroadcasterId
+                        // bot not needed in condition for this event type
+                    }
+                })
+            });
+
+            if (!redemptionResponse.ok) {
+                if (redemptionResponse.status === 409)
+                    console.log('✅ Subscription (Redemptions) already exists');
+
+                else {
+                    let text = await redemptionResponse.text();
+                    console.error('Failed to subscribe to Redemptions:', text);
+                }
+            }
+
+            else console.log('✅ Subscribed to channel.channel_points_custom_reward_redemption.add');
+        }
+
+        catch (error) {
             console.error('Error subscribing to events:', error);
             // Critical: Close the socket to prevent infinite reconnect loop if subscription fails
             this.eventSub.close();
@@ -316,18 +379,20 @@ export default class {
     public async loadDynamicCommands(): Promise<void> {
         try {
             const dynamicCommandsFile = Bun.file('./src/Config/dynamic-commands.json');
+
             if (await dynamicCommandsFile.exists()) {
                 const commandsData = await dynamicCommandsFile.json() as Record<string, DynamicCommand>;
 
-                for (const [name, command] of Object.entries(commandsData)) {
+                for (const [name, command] of Object.entries(commandsData))
                     this.dynamicCommands.set(name, command);
-                }
 
                 console.log(`📝 Loaded ${this.dynamicCommands.size} dynamic commands`);
-            } else {
-                console.log('📝 No dynamic-commands.json found, starting with 0 dynamic commands');
             }
-        } catch (error) {
+
+            else console.log('📝 No dynamic-commands.json found, starting with 0 dynamic commands');
+        }
+
+        catch (error) {
             console.warn('Could not load dynamic commands:', error);
         }
     }
@@ -336,12 +401,13 @@ export default class {
         try {
             const commandsData: Record<string, DynamicCommand> = {};
 
-            for (const [name, command] of this.dynamicCommands.entries()) {
+            for (const [name, command] of this.dynamicCommands.entries())
                 commandsData[name] = command;
-            }
 
             await Bun.write('./src/Config/dynamic-commands.json', JSON.stringify(commandsData, null, 2));
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Could not save dynamic commands:', error);
             throw error;
         }
@@ -361,13 +427,15 @@ export default class {
 
             // Publish update to all connected clients
             const commands: Record<string, any> = {};
-            for (const [n, cmd] of this.dynamicCommands.entries()) {
+            for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
-            }
+
             server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
 
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error adding dynamic command:', error);
             return false;
         }
@@ -384,13 +452,15 @@ export default class {
 
             // Publish update to all connected clients
             const commands: Record<string, any> = {};
-            for (const [n, cmd] of this.dynamicCommands.entries()) {
+            for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
-            }
+
             server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
 
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error removing dynamic command:', error);
             return false;
         }
@@ -415,13 +485,15 @@ export default class {
 
             // Publish update to all connected clients
             const commands: Record<string, any> = {};
-            for (const [n, cmd] of this.dynamicCommands.entries()) {
+            for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
-            }
+
             server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
 
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error updating dynamic command:', error);
             return false;
         }
@@ -436,16 +508,17 @@ export default class {
 
                 for (const [name, timer] of Object.entries(timersData)) {
                     this.timers.set(name, timer);
-                    if (timer.enabled) {
+                    if (timer.enabled)
                         this.startTimer(timer);
-                    }
                 }
 
                 console.log(`⏱️ Loaded ${this.timers.size} timers`);
-            } else {
-                console.log('⏱️ No timers.json found, starting with 0 timers');
             }
-        } catch (error) {
+
+            else console.log('⏱️ No timers.json found, starting with 0 timers');
+        }
+
+        catch (error) {
             console.warn('Could not load timers:', error);
         }
     }
@@ -454,12 +527,13 @@ export default class {
         try {
             const timersData: Record<string, Timer> = {};
 
-            for (const [name, timer] of this.timers.entries()) {
+            for (const [name, timer] of this.timers.entries())
                 timersData[name] = timer;
-            }
 
             await Bun.write('./src/Config/timers.json', JSON.stringify(timersData, null, 2));
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Could not save timers:', error);
             throw error;
         }
@@ -488,9 +562,8 @@ export default class {
         // Validate interval: minimum 1 minute, maximum 1440 minutes (24 hours)
         const validInterval = Math.max(1, Math.min(1440, Math.floor(interval)));
 
-        if (this.timers.has(name)) {
+        if (this.timers.has(name))
             return false;
-        }
 
         try {
             const timer: Timer = {
@@ -505,7 +578,9 @@ export default class {
             await this.saveTimers();
             this.broadcastTimers();
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error adding timer:', error);
             return false;
         }
@@ -519,8 +594,11 @@ export default class {
                 await this.saveTimers();
                 this.broadcastTimers();
             }
+
             return deleted;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error removing timer:', error);
             return false;
         }
@@ -532,15 +610,18 @@ export default class {
 
         try {
             timer.enabled = !timer.enabled;
-            if (timer.enabled) {
+            if (timer.enabled)
                 this.startTimer(timer);
-            } else {
+
+            else
                 this.stopTimer(name);
-            }
+
             await this.saveTimers();
             this.broadcastTimers();
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error toggling timer:', error);
             return false;
         }
@@ -557,14 +638,15 @@ export default class {
             timer.message = message;
             timer.interval = validInterval;
 
-            if (timer.enabled) {
+            if (timer.enabled)
                 this.startTimer(timer);
-            }
 
             await this.saveTimers();
             this.broadcastTimers();
             return true;
-        } catch (error) {
+        }
+
+        catch (error) {
             console.error('Error updating timer:', error);
             return false;
         }
@@ -576,5 +658,20 @@ export default class {
             timers[n] = t;
         }
         server.publish('commands', JSON.stringify({ type: 'allTimers', timers }));
+    }
+
+    public stop(): void {
+        console.log('🛑 Stopping bot instance...');
+
+        // Stop all timers
+        for (const [name, interval] of this.runningTimers) {
+            clearInterval(interval);
+        }
+        this.runningTimers.clear();
+
+        // Close EventSub connection
+        if (this.eventSub) {
+            this.eventSub.close();
+        }
     }
 }

@@ -8,6 +8,9 @@
         "user:write:chat",
         "moderator:manage:announcements",
         "moderator:manage:shoutouts",
+        "moderator:manage:announcements",
+        "moderator:manage:shoutouts",
+        "channel:manage:redemptions",
         "channel:bot"
     ],
     "app": [
