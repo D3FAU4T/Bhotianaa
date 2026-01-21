@@ -2,12 +2,12 @@ import React from "react";
 import Block from "./Block";
 
 interface CommandBlockProps {
-    count: number;
+    value: number | string;
     label: string;
     onClick: () => void;
 }
 
-const CommandBlock: React.FC<CommandBlockProps> = ({ count, label, onClick }) => {
+const CommandBlock: React.FC<CommandBlockProps> = ({ value, label, onClick }) => {
     return (
         <Block
             onClick={onClick}
@@ -18,7 +18,7 @@ const CommandBlock: React.FC<CommandBlockProps> = ({ count, label, onClick }) =>
                 alignItems: "center"
             }}
         >
-            <h1>{count}</h1>
+            <h1>{value}</h1>
             <p>{label}</p>
         </Block>
     );

@@ -21,7 +21,7 @@ import {
 
 import dashboardView from './src/Views/dashboard.html';
 import clipsView from './src/Views/clips.html';
-import { fetchStreamInfo, checkUpdates } from './src/Core/Functions';
+import { fetchStreamInfo, checkUpdates } from './src/Core/ServerFunctions';
 
 let twitchClient: InstanceType<typeof import('./src/Core/Client').default> | null = null;
 

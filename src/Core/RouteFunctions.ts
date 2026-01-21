@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { CSRF, type BunRequest } from 'bun';
-import type { TwitchAuth, TwitchGame, TwitchUser } from '../Typings/TwitchAPI';
+import type { TwitchAuth, TwitchUser } from '../Typings/TwitchAPI';
 
 const getTokenFile = () => Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 

@@ -51,8 +51,7 @@ header {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    width: 17rem;
-    height: calc(100vh - 6rem);
+    height: 100%;
 }
 
 .lower aside h2 {

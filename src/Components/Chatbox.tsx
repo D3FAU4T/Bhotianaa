@@ -35,13 +35,15 @@ const getBadgeUrl = (setId: string, versionId: string): string | null => {
     return null;
 };
 
-const Chatbox = ({ messages, ws }: Props) => {
-
+const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
+    // ... ref and state ...
     const chatboxRef = useRef<HTMLDivElement | null>(null);
     const [isScrollPaused, setIsScrollPaused] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [messageInput, setMessageInput] = useState("");
     const isAutoScrolling = useRef(false);
+
+    // ... methods ...
 
     const scrollToBottom = () => {
         if (chatboxRef.current) {
@@ -100,10 +102,10 @@ const Chatbox = ({ messages, ws }: Props) => {
         for (const badge of userstate.badges) {
             const badgeName = badge.set_id;
             const badgeId = badge.id;
-            
+
             // Debug log to see what set_id we're receiving
             console.log(`Badge received - set_id: ${badgeName}, id: ${badgeId}, info: ${badge.info}`);
-            
+
             const badgeUrl = getBadgeUrl(badgeName, badgeId);
 
             if (badgeUrl) {
@@ -232,7 +234,7 @@ const Chatbox = ({ messages, ws }: Props) => {
     }, [messages, isScrollPaused]);
 
     return (
-        <aside className="block">
+        <aside className="block" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <h2>Messages</h2>
             <div className="chatbox" ref={chatboxRef} onScroll={handleScroll}>
                 <div style={{ display: "flex", flexDirection: "column" }}>
