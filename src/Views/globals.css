@@ -173,3 +173,55 @@ body {
     display: flex;
     flex-direction: column;
 }
+
+/* Drag and Drop Styles */
+.block.dragging {
+    opacity: 0.5;
+    border: 2px dashed #7d2ee0;
+}
+
+.edit-mode .block {
+    cursor: grab;
+    position: relative;
+    border: 1px dashed #444;
+    animation: wiggle 0.3s ease-in-out infinite alternate;
+}
+
+.edit-mode .block:active {
+    cursor: grabbing;
+}
+
+@keyframes wiggle {
+    from {
+        transform: rotate(-0.5deg);
+    }
+
+    to {
+        transform: rotate(0.5deg);
+    }
+}
+
+button.edit-btn {
+    padding: 0.5rem 1rem;
+    background-color: transparent;
+    color: #888;
+    border: 1px solid #444;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    position: absolute;
+    right: 1rem;
+    transition: all 0.2s;
+}
+
+button.edit-btn:hover {
+    color: white;
+    border-color: #666;
+}
+
+button.edit-btn.active {
+    background-color: #7d2ee0;
+    color: white;
+    border-color: #7d2ee0;
+    box-shadow: 0 0 10px rgba(125, 46, 224, 0.3);
+}
