@@ -1,4 +1,5 @@
 import type Bhotianaa from '../Core/Client';
+import { formatDate } from '../Core/Functions';
 import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
 export default <ICommand>{
@@ -37,11 +38,7 @@ export default <ICommand>{
         }
 
         const dynamicCommand = client.dynamicCommands.get(commandName)!;
-        const date = new Date(dynamicCommand.createdAt);
-        const day = date.getDate();
-        const month = date.toLocaleDateString('en-US', { month: 'short' });
-        const year = date.getFullYear();
-        const createdDate = `${day} ${month} ${year}`;
+        const createdDate = formatDate(dynamicCommand.createdAt);
 
         await client.twitch.say(`@${userstate.user_name} !${commandName} - Created by ${dynamicCommand.createdBy} on ${createdDate}. Response: ${dynamicCommand.response}`);
     }

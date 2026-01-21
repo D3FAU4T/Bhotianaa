@@ -10,12 +10,12 @@ export default <ICommand> {
         const [goalStr, numsStr] = context.args.join(" ").split(';');
 
         if (!goalStr || !numsStr)
-            return client.twitch.say("Usage: !numble <target>; <num1> <num2> <num3>...");
+            return await client.twitch.say("Usage: !numble <target>; <num1> <num2> <num3>...");
 
         // Parse target number
         const target = parseFloat(goalStr.trim());
         if (isNaN(target))
-            return client.twitch.say("❌ Invalid target number. Please provide a valid number.");
+            return await client.twitch.say("❌ Invalid target number. Please provide a valid number.");
 
         // Parse numbers array
         const numberStrings = numsStr.trim().split(/\s+/);
@@ -25,28 +25,29 @@ export default <ICommand> {
             const num = parseFloat(numStr);
 
             if (isNaN(num))
-                return client.twitch.say(`❌ Invalid number: \"${numStr}\". Please provide valid numbers.`);
+                return await client.twitch.say(`❌ Invalid number: \"${numStr}\". Please provide valid numbers.`);
             
             numbers.push(num);
         }
 
         if (numbers.length < 2)
-            return client.twitch.say("❌ Please provide at least 2 numbers to work with.");
+            return await client.twitch.say("❌ Please provide at least 2 numbers to work with.");
 
         try {
+            await client.twitch.say("Computing...");
             const initialExprs: readonly string[] = numbers.map(n => n.toString());
             const solution = findMathExpression(numbers, initialExprs, target);
 
             if (solution)
-                client.twitch.say(`🎉 Found it: ${solution} = ${target}`);
+                await client.twitch.say(`🎉 Found it: ${solution} = ${target}`);
             
             else
-                client.twitch.say(`😕 No solution found`);
+                await client.twitch.say(`😕 No solution found`);
         }
         
         catch (error) {
             console.error('Math solver error:', error);
-            client.twitch.say("❌ An error occurred while solving. Please try again.");
+            await client.twitch.say("❌ An error occurred while solving. Please try again.");
         }
     }
 }

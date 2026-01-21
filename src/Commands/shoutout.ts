@@ -4,10 +4,10 @@ import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 import type { StreamGoodClips, TwitchChannel, TwitchUser } from '../Typings/TwitchAPI';
 
 export default <ICommand>{
-    name: 'so',
+    name: 'shoutout',
     description: 'Sends a shoutout to a channel',
     moderatorOnly: true,
-    aliases: ['shoutout'],
+    aliases: ['so'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const targetChannel = context.args[0]?.toLowerCase().replace('@', '');
 

@@ -2,9 +2,9 @@ import type Bhotianaa from '../Core/Client';
 import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 
 export default <ICommand>{
-    name: 'listtimers',
+    name: 'timers',
     description: 'List all active timers',
-    aliases: ['timers'],
+    aliases: ['timer'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const { userstate } = context;
 

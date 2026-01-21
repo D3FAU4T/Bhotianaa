@@ -4,7 +4,7 @@ import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
 export default <ICommand>{
     name: 'link',
     description: 'Sets the temporary link or get it',
-    aliases: ['mirror'],
+    aliases: ['mirror', 'wos', 'gos'],
     async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
         const url = context.args[0];
 

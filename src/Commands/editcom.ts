@@ -40,10 +40,9 @@ export default <ICommand>{
 
         const success = await client.updateDynamicCommand(commandName, newResponse);
 
-        if (success) {
+        if (success)
             await client.twitch.say(`@${userstate.user_name} Command !${commandName} has been updated successfully! VoHiYo`);
-        } else {
+        else
             await client.twitch.say(`@${userstate.user_name} Failed to update command !${commandName}. Please try again.`);
-        }
     }
 };
