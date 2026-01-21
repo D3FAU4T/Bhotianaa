@@ -8,7 +8,7 @@
         "start": "bun --env-file=.env.production.local run index.ts"
     },
     "devDependencies": {
-        "@types/bun": "^1.3.5",
+        "@types/bun": "^1.3.6",
         "@types/react-dom": "^19.2.3"
     },
     "peerDependencies": {
