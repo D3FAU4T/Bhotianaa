@@ -279,4 +279,5 @@ const initBot = async () => {
 
 initBot().catch(error => {
     console.error('Failed to initialize bot:', error);
+    process.exit(1);
 });

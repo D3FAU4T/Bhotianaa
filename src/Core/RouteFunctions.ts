@@ -208,7 +208,7 @@ export const updateConduitShard = async (req: BunRequest<'/api/conduit/update'>)
     if (!appToken) return new Response('No App Token', { status: 500 });
 
     console.log(`🔗 Assigning Shard 0 to Session: ${session_id}`);
-    const response = await fetch('https://api.twitch.tv/helix/eventsub/conduits/shards', {
+    let response = await fetch('https://api.twitch.tv/helix/eventsub/conduits/shards', {
         method: 'PATCH',
         headers: {
             'Authorization': `Bearer ${appToken.access_token}`,
@@ -226,6 +226,37 @@ export const updateConduitShard = async (req: BunRequest<'/api/conduit/update'>)
             }]
         })
     });
+
+    // If Conduit Not Found (404), recreate it and retry
+    if (response.status === 404) {
+        console.warn('⚠️ Conduit ID not found on Twitch. Recreating...');
+        const tokens = await readTokensSafe();
+        tokens.conduit_id = undefined;
+        await saveTokens(tokens);
+
+        const newConduitId = await getConduit();
+        if (!newConduitId) return new Response('Failed to recreate conduit', { status: 500 });
+
+        console.log(`🔗 Assigning Shard 0 to Session: ${session_id} (New Conduit: ${newConduitId})`);
+        response = await fetch('https://api.twitch.tv/helix/eventsub/conduits/shards', {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${appToken.access_token}`,
+                'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                conduit_id: newConduitId,
+                shards: [{
+                    id: "0",
+                    transport: {
+                        method: 'websocket',
+                        session_id: session_id
+                    }
+                }]
+            })
+        });
+    }
 
     if (!response.ok) {
         const err = await response.text();
