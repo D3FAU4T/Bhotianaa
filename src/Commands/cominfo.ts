@@ -20,7 +20,7 @@ export default <ICommand>{
             return;
         }
 
-        // Remove the ! prefix if provided
+
         if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
 

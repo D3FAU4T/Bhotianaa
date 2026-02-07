@@ -50,4 +50,21 @@ export default class TwitchAPI {
             throw error;
         }
     }
+
+    public async getUserId(username: string): Promise<string | null> {
+        try {
+            const response = await fetch(`${server.url}twitch/users?login=${username.toLowerCase()}`);
+
+            if (!response.ok) {
+                console.error('Failed to fetch user ID:', response.status);
+                return null;
+            }
+
+            const data = await response.json() as { data: { id: string; login: string }[] };
+            return data.data?.[0]?.id || null;
+        } catch (error) {
+            console.error('Error fetching user ID:', error);
+            return null;
+        }
+    }
 }

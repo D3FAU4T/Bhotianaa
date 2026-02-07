@@ -59,16 +59,16 @@ export const server = serve({
         async open(ws) {
             if (ws.data.room === 'chat')
                 ws.subscribe('chat');
+
             else if (ws.data.room === 'commands') {
                 ws.subscribe('commands');
-                // Send stream info on connection
                 const streamInfo = await fetchStreamInfo();
                 ws.send(JSON.stringify({ type: 'streamInfo', data: streamInfo }));
             }
+
             else
                 ws.subscribe('clips');
 
-            // Start heartbeat
             ws.data.heartbeatInterval = setInterval(
                 () => ws.send('6'),
                 30000
@@ -77,15 +77,13 @@ export const server = serve({
         async message(ws, message) {
             const messageStr = message.toString();
 
-            // Handle heartbeat
             if (messageStr === '9') return;
 
             const data = JSON.parse(messageStr);
 
             if (ws.data.room === 'chat') {
-                if (twitchClient && data.message) {
+                if (twitchClient && data.message)
                     twitchClient.twitch.say(data.message);
-                }
             }
 
             else if (ws.data.room === 'commands') {
@@ -119,10 +117,13 @@ export const server = serve({
                 else if (data.action === 'delete') {
                     const { name } = data;
                     const success = await twitchClient.removeDynamicCommand(name);
+
                     if (success) {
                         const commands: Record<string, any> = {};
+
                         for (const [n, command] of twitchClient.dynamicCommands.entries())
                             commands[n] = command;
+
                         server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
                     }
 
@@ -134,8 +135,10 @@ export const server = serve({
                     const success = await twitchClient.updateDynamicCommand(name, response);
                     if (success) {
                         const commands: Record<string, any> = {};
+
                         for (const [n, command] of twitchClient.dynamicCommands.entries())
                             commands[n] = command;
+
                         server.publish('commands', JSON.stringify({ type: 'allCommands', commands }));
                     }
 
@@ -144,6 +147,7 @@ export const server = serve({
 
                 else if (data.action === 'getSystemCommands') {
                     const commands: Record<string, any> = {};
+
                     for (const [name, command] of twitchClient.commands.entries()) {
                         commands[name] = {
                             name: command.name,
@@ -152,51 +156,52 @@ export const server = serve({
                             moderatorOnly: command.moderatorOnly || false
                         };
                     }
+
                     ws.send(JSON.stringify({ type: 'systemCommands', commands }));
                 }
 
                 else if (data.action === 'getAllTimers') {
                     const timers: Record<string, any> = {};
+
                     for (const [name, timer] of twitchClient.timers.entries())
                         timers[name] = timer;
+
                     ws.send(JSON.stringify({ type: 'allTimers', timers }));
                 }
 
                 else if (data.action === 'createTimer') {
                     const { name, message, interval } = data;
                     const success = await twitchClient.addTimer(name, message, parseInt(interval));
-                    if (!success) {
+
+                    if (!success)
                         ws.send(JSON.stringify({ error: 'Failed to create timer' }));
-                    }
                 }
 
                 else if (data.action === 'deleteTimer') {
                     const { name } = data;
+
                     const success = await twitchClient.removeTimer(name);
-                    if (!success) {
+
+                    if (!success)
                         ws.send(JSON.stringify({ error: 'Failed to delete timer' }));
-                    }
                 }
 
                 else if (data.action === 'updateTimer') {
                     const { name, message, interval } = data;
                     const success = await twitchClient.updateTimer(name, message, parseInt(interval));
-                    if (!success) {
+                    if (!success)
                         ws.send(JSON.stringify({ error: 'Failed to update timer' }));
-                    }
                 }
 
                 else if (data.action === 'toggleTimer') {
                     const { name } = data;
                     const success = await twitchClient.toggleTimer(name);
-                    if (!success) {
+                    if (!success)
                         ws.send(JSON.stringify({ error: 'Failed to toggle timer' }));
-                    }
                 }
             }
         },
         close(ws, code, reason) {
-            // Clear heartbeat interval
             if (ws.data.heartbeatInterval)
                 clearInterval(ws.data.heartbeatInterval);
 
@@ -231,7 +236,6 @@ export const server = serve({
         return new Response('Not Found', { status: 404 });
     },
 
-    // Global error handler - handles all uncaught errors from routes
     error(error) {
         console.error('Server error:', error);
 
@@ -249,9 +253,7 @@ export const server = serve({
 
 console.log(`Local server running on ${server.url}\nTo terminate the app, press Ctrl+C\n`);
 
-// Initialize Bot
 const initBot = async () => {
-    // Stop existing instance if any
     if (twitchClient) {
         twitchClient.stop();
         twitchClient = null;
@@ -268,31 +270,30 @@ const initBot = async () => {
                 tokens.bot.user_id
             );
             await twitchClient.connect();
-        } catch (e) {
-            console.error('Failed to connect bot:', e);
         }
-    } else {
+
+        catch (e) { console.error('Failed to connect bot:', e); }
+    }
+
+    else {
         console.warn(`⚠️  Bot not fully configured.`);
+
         if (!tokens.broadcaster)
             console.warn(`   👉 Visit ${server.url}auth/login/broadcaster to authenticate Broadcaster Account.`);
+
         if (!tokens.bot)
             console.warn(`   👉 Visit ${server.url}auth/login/bot to authenticate Bot Account.`);
     }
 }
 
-// Start Server & Bot
 const start = async () => {
     await checkUpdates();
 
-    // Start token validation loop (every hour)
     setInterval(() => fetch(server.url + 'auth/validate'), 3600000);
-    // Initial validation
     fetch(server.url + 'auth/validate');
 
-    // Initialize Bot
     await initBot();
 
-    // Listen for Auth Updates
     events.on('auth:update', () => {
         console.log('🔄 Auth update detected. Restarting bot...');
         initBot();

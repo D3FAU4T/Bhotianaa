@@ -38,6 +38,8 @@ src/Config/tokens.json
 src/Cache/
 src/Config/dynamic-commands.json
 src/Config/timers.json
+src/**/*.bak
+src/Config/points.json
 
 # Fix version mismatch
 bun.lock

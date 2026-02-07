@@ -1,7 +1,7 @@
 import EventSubWebSocket from './EventSubWebSocket';
 import TwitchAPI from './TwitchAPI';
 import { server } from '../..';
-import type { ChatUserstate } from '../Typings/EventSub.d';
+import type { ChannelPointsCustomRewardRedemptionAddEvent, ChatUserstate } from '../Typings/EventSub.d';
 import type { BotState, ICommand, DynamicCommand, Timer } from '../Typings/Bhotianaa';
 import type { ChatMessageEvent, EventSubNotification } from '../Typings/EventSub.d';
 
@@ -79,7 +79,6 @@ export default class {
             if (msg.includes('bhotiana'))
                 return await this.twitch.say(`@${userstate.user_login} What!? 👀`);
 
-            // Handle message ending with ',' (repeat without comma)
             if (msg.endsWith(',')) {
                 const msgToRepeat = msg.slice(0, -1);
                 if (msgToRepeat.length)
@@ -88,8 +87,53 @@ export default class {
         });
 
         // Handle Channel Points Redemptions
-        this.eventSub.on('channel.channel_points_custom_reward_redemption.add', (notification) => {
-            console.log('💎 Channel Point Redemption:', JSON.stringify(notification.event, null, 2));
+        this.eventSub.on('channel.channel_points_custom_reward_redemption.add', async (notification) => {
+            const event = notification.event as ChannelPointsCustomRewardRedemptionAddEvent;
+
+            // Gamble redemption
+            if (event.reward.id === 'fde52afc-7bc1-48ff-9c00-e72a7b2d022d') {
+
+                const winEmote = 'gianaaHi';
+                const loseEmote = 'gianaaBomb';
+                const neutralEmotes = ['GlitchCat', 'PixelBob', 'LUL', 'PinkMercy', 'HSWP', 'TehePelo', 'Kappa'];
+
+                const emotePool = [winEmote, loseEmote, ...neutralEmotes];
+                const selectedEmote = emotePool[Math.floor(Math.random() * emotePool.length)];
+
+                try {
+                    const pointsFile = Bun.file('./src/Config/points.json');
+                    let pointsData: Record<string, number> = {};
+
+                    if (await pointsFile.exists())
+                        pointsData = await pointsFile.json();
+
+                    const userId = event.user_id;
+                    const currentPoints = pointsData[userId] || 0;
+                    let resultMessage = '';
+
+                    if (selectedEmote === winEmote) {
+                        pointsData[userId] = currentPoints + 10;
+                        resultMessage = `@${event.user_login} ${selectedEmote} You won! +10 points! New balance: ${pointsData[userId]} points`;
+                    }
+
+                    else if (selectedEmote === loseEmote) {
+                        const lostPoints = currentPoints;
+                        pointsData[userId] = 0;
+                        resultMessage = `@${event.user_login} ${selectedEmote} Oh no! You lost all ${lostPoints} points! Better luck next time!`;
+                    }
+
+                    else
+                        resultMessage = `@${event.user_login} ${selectedEmote} Neutral! No points gained or lost.`;
+
+                    await Bun.write('./src/Config/points.json', JSON.stringify(pointsData, null, 2));
+                    await this.twitch.say(resultMessage);
+                }
+
+                catch (error) {
+                    console.error('Error processing gamble:', error);
+                    await this.twitch.say(`@${event.user_login} Sorry, something went wrong with the gamble!`);
+                }
+            }
         });
     }
 
@@ -116,10 +160,9 @@ export default class {
 
         if (!commandName) return;
 
-        // Check for hard-coded commands first (direct name match)
         let command = this.commands.get(commandName);
 
-        // If no direct match, check for aliases
+        // Alias checking
         if (!command) {
             for (const [, cmd] of this.commands) {
                 if (cmd.aliases && cmd.aliases.includes(commandName)) {
@@ -155,7 +198,6 @@ export default class {
             return;
         }
 
-        // Check for dynamic commands
         const dynamicCommand = this.dynamicCommands.get(commandName);
 
         if (dynamicCommand) {
@@ -174,7 +216,6 @@ export default class {
     }
 
     public async initializeState(): Promise<void> {
-        // Load temporary link from config
         try {
             const linkFile = Bun.file('./src/Config/Links.json');
             if (await linkFile.exists()) {
@@ -263,6 +304,7 @@ export default class {
                                 'Authorization': `Bearer ${tokens.app.access_token}`
                             }
                         });
+
                         if (userRes.ok) {
                             const userData = await userRes.json() as { data: { id: string }[] };
                             if (userData.data?.[0]?.id) {
@@ -275,7 +317,9 @@ export default class {
                             }
                         }
                     }
-                } catch (e) {
+                }
+
+                catch (e) {
                     console.error('Check Dev Channel Error:', e);
                 }
             }
@@ -307,7 +351,6 @@ export default class {
 
             else console.log('✅ Subscribed to channel.chat.message');
 
-            // Subscribe to Channel Points Redemptions
             console.log('🔗 Subscribing to channel.channel_points_custom_reward_redemption.add...');
             const redemptionResponse = await fetch(`${server.url}api/eventsub/subscribe`, {
                 method: 'POST',
@@ -317,7 +360,6 @@ export default class {
                     version: '1',
                     condition: {
                         broadcaster_user_id: subscriptionBroadcasterId
-                        // bot not needed in condition for this event type
                     }
                 })
             });
@@ -343,7 +385,6 @@ export default class {
         }
     }
 
-    // Bot utility methods
     public setBigWord(word: string): string | null {
         this.state.bigWordActive = true;
         this.state.bigWord = word.replace(/\p{Emoji}/gu, '').toUpperCase().split('').join(' ');
@@ -425,7 +466,6 @@ export default class {
             this.dynamicCommands.set(name, command);
             await this.saveDynamicCommands();
 
-            // Publish update to all connected clients
             const commands: Record<string, any> = {};
             for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
@@ -450,7 +490,6 @@ export default class {
             this.dynamicCommands.delete(name);
             await this.saveDynamicCommands();
 
-            // Publish update to all connected clients
             const commands: Record<string, any> = {};
             for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
@@ -473,7 +512,6 @@ export default class {
                 return false;
             }
 
-            // Preserve original metadata, only update response
             const updatedCommand: DynamicCommand = {
                 ...existingCommand,
                 response,
@@ -483,7 +521,6 @@ export default class {
             this.dynamicCommands.set(name, updatedCommand);
             await this.saveDynamicCommands();
 
-            // Publish update to all connected clients
             const commands: Record<string, any> = {};
             for (const [n, cmd] of this.dynamicCommands.entries())
                 commands[n] = cmd;
@@ -654,24 +691,21 @@ export default class {
 
     private broadcastTimers(): void {
         const timers: Record<string, Timer> = {};
-        for (const [n, t] of this.timers.entries()) {
+        for (const [n, t] of this.timers.entries())
             timers[n] = t;
-        }
+
         server.publish('commands', JSON.stringify({ type: 'allTimers', timers }));
     }
 
     public stop(): void {
         console.log('🛑 Stopping bot instance...');
 
-        // Stop all timers
-        for (const [name, interval] of this.runningTimers) {
+        for (const [name, interval] of this.runningTimers)
             clearInterval(interval);
-        }
+
         this.runningTimers.clear();
 
-        // Close EventSub connection
-        if (this.eventSub) {
+        if (this.eventSub)
             this.eventSub.close();
-        }
     }
 }

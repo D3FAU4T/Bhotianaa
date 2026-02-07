@@ -56,7 +56,9 @@ export default class EventSubWebSocket {
                     this.off('session_welcome', welcomeHandler);
                 }, 10000);
 
-            } catch (error) {
+            }
+
+            catch (error) {
                 console.error('Failed to create WebSocket:', error);
                 reject(error);
             }
@@ -120,8 +122,7 @@ export default class EventSubWebSocket {
     }
 
     private handleKeepalive(): void {
-        // Reset keepalive timeout
-        this.resetKeepalive(10); // Default 10 seconds
+        this.resetKeepalive(10);
     }
 
     private handleNotification(message: EventSubMessage): void {
@@ -138,7 +139,6 @@ export default class EventSubWebSocket {
                 handler(notification);
             }
 
-            // Reset keepalive on notification
             this.resetKeepalive(10);
         }
     }
@@ -158,7 +158,6 @@ export default class EventSubWebSocket {
     private resetKeepalive(timeoutSeconds: number): void {
         this.clearKeepalive();
 
-        // Set timeout with buffer (add 10 seconds)
         const timeoutMs = (timeoutSeconds + 10) * 1000;
         this.keepaliveTimeout = setTimeout(() => {
             console.warn('⚠️ Keepalive timeout - connection may be stale');

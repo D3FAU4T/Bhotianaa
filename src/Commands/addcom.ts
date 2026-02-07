@@ -20,17 +20,16 @@ export default <ICommand>{
             return;
         }
 
-        // Remove the ! prefix if provided
+
         if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
 
-        // Validate command name
+
         if (!commandName || commandName.includes(' ')) {
             await client.twitch.say(`@${userstate.user_name} Invalid command name. Command names cannot contain spaces.`);
             return;
         }
 
-        // Check if command already exists (hard-coded or dynamic)
         if (client.commands.has(commandName) || client.dynamicCommands.has(commandName)) {
             await client.twitch.say(`@${userstate.user_name} Command !${commandName} already exists.`);
             return;
@@ -38,12 +37,11 @@ export default <ICommand>{
 
         const response = args.slice(1).join(' ');
 
-        // Add the dynamic command
         const success = await client.addDynamicCommand(commandName, response, userstate.user_login!);
 
         if (success)
             await client.twitch.say(`@${userstate.user_name} Command !${commandName} has been added successfully! VoHiYo`);
-        
+
         else
             await client.twitch.say(`@${userstate.user_name} Failed to add command !${commandName}. Please try again.`);
     }

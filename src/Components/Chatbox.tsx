@@ -7,9 +7,7 @@ type Props = {
     ws: WebSocket | null;
 }
 
-// Dynamic badge URL builder - constructs badge URLs from set_id and version id
 const getBadgeUrl = (setId: string, versionId: string): string | null => {
-    // Map of set_id to badge UUID patterns
     const badgeUuids: Record<string, string> = {
         'broadcaster': '5527c58c-fb7d-422d-b71b-f309dcb85cc1',
         'moderator': '3267646d-33f0-4b17-b3df-f923a41db1d0',
@@ -31,19 +29,15 @@ const getBadgeUrl = (setId: string, versionId: string): string | null => {
         return `https://static-cdn.jtvnw.net/badges/v1/${uuid}/${versionId}`;
     }
 
-    // Return null for unknown badges (subscriber, etc.)
     return null;
 };
 
 const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
-    // ... ref and state ...
     const chatboxRef = useRef<HTMLDivElement | null>(null);
     const [isScrollPaused, setIsScrollPaused] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
     const [messageInput, setMessageInput] = useState("");
     const isAutoScrolling = useRef(false);
-
-    // ... methods ...
 
     const scrollToBottom = () => {
         if (chatboxRef.current) {
@@ -92,18 +86,14 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
         }
     };
 
-    // Render badges from userstate
     const renderBadges = (userstate: any) => {
         if (!userstate.badges || !Array.isArray(userstate.badges)) return null;
 
         const badges = [];
-
-        // EventSub badges come as an array of objects: [{ set_id: 'broadcaster', id: '1', info: '' }, ...]
         for (const badge of userstate.badges) {
             const badgeName = badge.set_id;
             const badgeId = badge.id;
 
-            // Debug log to see what set_id we're receiving
             console.log(`Badge received - set_id: ${badgeName}, id: ${badgeId}, info: ${badge.info}`);
 
             const badgeUrl = getBadgeUrl(badgeName, badgeId);
@@ -124,8 +114,9 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
                         }}
                     />
                 );
-            } else if (badgeName === 'subscriber') {
-                // For subscriber badges, show a generic subscriber icon with months
+            }
+            
+            else if (badgeName === 'subscriber') {
                 badges.push(
                     <span
                         key={`${badgeName}-${badgeId}`}
@@ -148,26 +139,20 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
                         ★
                     </span>
                 );
-            } else {
-                // Log unknown badges so we can add them later
-                console.warn(`Unknown badge set_id: ${badgeName} with id: ${badgeId}`);
             }
+            
+            else console.warn(`Unknown badge set_id: ${badgeName} with id: ${badgeId}`);
         }
 
         return badges;
     };
 
-    // Parse message and render emotes
     const parseMessage = (message: string, emotes: any) => {
-        if (!emotes) {
+        if (!emotes)
             return <span>{message}</span>;
-        }
 
-        // Create an array of message parts with their positions
         const parts: Array<{ type: 'text' | 'emote', content: string, start: number, end: number, emoteId?: string }> = [];
 
-        // Parse emote positions
-        // emotes format: { "25": ["0-4", "6-10"], "1902": ["12-19"] }
         for (const [emoteId, positions] of Object.entries(emotes)) {
             for (const position of positions as string[]) {
                 const [startStr, endStr] = position.split('-');
@@ -186,21 +171,16 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
             }
         }
 
-        // Sort by start position
         parts.sort((a, b) => a.start - b.start);
 
-        // Fill in text parts between emotes
         const result: React.JSX.Element[] = [];
         let lastEnd = 0;
 
         parts.forEach((part, index) => {
-            // Add text before this emote
             if (part.start > lastEnd) {
                 const textContent = message.substring(lastEnd, part.start);
                 result.push(<span key={`text-${lastEnd}`}>{textContent}</span>);
             }
-
-            // Add emote
             result.push(
                 <img
                     key={`emote-${index}-${part.emoteId}`}
@@ -218,7 +198,6 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
             lastEnd = part.end;
         });
 
-        // Add remaining text after last emote
         if (lastEnd < message.length) {
             const textContent = message.substring(lastEnd);
             result.push(<span key={`text-${lastEnd}`}>{textContent}</span>);
@@ -228,9 +207,8 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
     };
 
     useEffect(() => {
-        if (!isScrollPaused) {
+        if (!isScrollPaused)
             scrollToBottom();
-        }
     }, [messages, isScrollPaused]);
 
     return (

@@ -20,7 +20,7 @@ export default <ICommand>{
             return;
         }
 
-        // Remove the ! prefix if provided
+
         if (commandName.startsWith('!'))
             commandName = commandName.slice(1);
 
@@ -41,7 +41,7 @@ export default <ICommand>{
 
         if (success)
             await client.twitch.say(`@${userstate.user_name} Command !${commandName} has been deleted successfully! VoHiYo`);
-        
+
         else
             await client.twitch.say(`@${userstate.user_name} Failed to delete command !${commandName}. Please try again.`);
     }

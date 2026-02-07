@@ -29,17 +29,15 @@ export const readTokensSafe = async (): Promise<TokenStore> => {
         const text = (await file.text()).trim();
         if (!text) return { broadcaster: null, bot: null, app: null };
         const data = JSON.parse(text);
-        // console.log('📖 Read tokens:', JSON.stringify(data, null, 0)); // Debug logging
         return normalizeTokens(data);
     } catch (e) {
         console.error('Error reading tokens file:', e);
-        return { broadcaster: null, bot: null, app: null }; // Should we return nulls or throw? returning nulls wipes data if we save later.
+        return { broadcaster: null, bot: null, app: null };
     }
 };
 
 const saveTokens = async (tokens: TokenStore) => {
     const file = getTokenFile();
-    // console.log('💾 Saving tokens:', JSON.stringify(tokens, null, 0)); // Debug logging
     await Bun.write(file, JSON.stringify(tokens, null, 4));
 };
 
@@ -116,10 +114,8 @@ export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
     }
 
     const tokens = await tokenResponse.json() as TwitchAuth;
-    // Re-read tokens immediately before saving to avoid overwriting recent changes
     const currentTokens = await readTokensSafe();
 
-    // Fetch User ID
     const userResponse = await fetch('https://api.twitch.tv/helix/users', {
         headers: {
             'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
@@ -129,18 +125,18 @@ export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
 
     if (userResponse.ok) {
         const userData = await userResponse.json() as { data: TwitchUser[] };
-        if (userData.data.length > 0) {
+
+        if (userData.data.length > 0)
             currentTokens[type] = { ...tokens, user_id: userData.data[0]?.id };
-        } else {
+        else
             currentTokens[type] = { ...tokens };
-        }
-    } else {
-        currentTokens[type] = { ...tokens };
     }
+
+    else currentTokens[type] = { ...tokens };
 
     await saveTokens(currentTokens);
 
-    events.emit('auth:update'); // Notify app to reload
+    events.emit('auth:update');
 
     return Response.redirect('/');
 };
@@ -148,7 +144,6 @@ export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
 export const getAppToken = async (): Promise<TwitchAuth | null> => {
     const tokens = await readTokensSafe();
 
-    // Check if valid
     if (tokens.app?.access_token) {
         const validate = await fetch('https://id.twitch.tv/oauth2/validate', {
             headers: { 'Authorization': `Bearer ${tokens.app.access_token}` }
@@ -156,7 +151,6 @@ export const getAppToken = async (): Promise<TwitchAuth | null> => {
         if (validate.ok) return tokens.app;
     }
 
-    // Generate new
     console.log('🔄 Generating new App Token...');
     const response = await fetch('https://id.twitch.tv/oauth2/token', {
         method: 'POST',
@@ -174,7 +168,6 @@ export const getAppToken = async (): Promise<TwitchAuth | null> => {
     }
 
     const newTokens = await response.json() as TwitchAuth;
-    // Read fresh to avoid overwrite
     const freshTokens = await readTokensSafe();
     freshTokens.app = newTokens;
     await saveTokens(freshTokens);
@@ -288,7 +281,6 @@ export const updateConduitShard = async (req: BunRequest<'/api/conduit/update'>)
 
 
 export const handleValidate = async (req: BunRequest<'/auth/validate'>) => {
-    // Read tokens fresh
     const tokens = await readTokensSafe();
     let changed = false;
 
@@ -315,33 +307,31 @@ export const handleValidate = async (req: BunRequest<'/auth/validate'>) => {
 
             if (refresh.ok) {
                 const refreshed = await refresh.json() as TwitchAuth;
-                // Re-read fresh tokens before updating in case of mutations elsewhere
                 const fresh = await readTokensSafe();
                 if (fresh[type]) {
-                    fresh[type] = { ...fresh[type]!, ...refreshed }; // Preserve user_id
-                    tokens[type] = fresh[type]; // Update local ref too
+                    fresh[type] = { ...fresh[type]!, ...refreshed };
+                    tokens[type] = fresh[type];
                     changed = true;
                 }
-            } else {
-                console.error(`Failed to refresh ${type} token`);
             }
+
+            else console.error(`Failed to refresh ${type} token`);
         }
     };
 
     await refreshUserToken('broadcaster');
     await refreshUserToken('bot');
 
-    // App Token check
-    if (!tokens.app) {
-        await getAppToken(); // handling save internally
-        // re-read strictly not needed if object ref matches but better safe
-    } else {
+    if (!tokens.app)
+        await getAppToken();
+
+    else {
         const validate = await fetch('https://id.twitch.tv/oauth2/validate', {
             headers: { 'Authorization': `Bearer ${tokens.app.access_token}` }
         });
-        if (!validate.ok) {
+
+        if (!validate.ok)
             await getAppToken();
-        }
     }
 
     if (changed) await saveTokens(tokens);
@@ -383,12 +373,9 @@ export const handleShoutout = async (req: BunRequest<"/twitch/shoutout">) => {
     const toId = url.searchParams.get("to_id");
     const tokens = await readTokensSafe();
 
-    // Need Broadcaster ID (from channel) and Bot Token (moderator action)
     if (!toId || !tokens.broadcaster?.user_id || !tokens.bot?.access_token || !tokens.bot?.user_id) {
         return new Response('Invalid request or unauthorized', { status: 400 });
     }
-
-    // Shoutout requires Moderator token. We use the Bot's token.
     return fetch(
         `https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${tokens.broadcaster.user_id}&to_broadcaster_id=${toId}&moderator_id=${tokens.bot.user_id}`, {
         method: "POST",
@@ -447,10 +434,9 @@ export const handleTwitchGames = async (req: BunRequest<'/twitch/games'>) => {
 
 export const handleTwitchAnnouncements = async (req: BunRequest<'/twitch/announcements'>) => {
     const tokens = await readTokensSafe();
-    // Need Broadcaster ID (target channel) and Bot Token (moderator action)
-    if (!tokens.broadcaster?.user_id || !tokens.bot?.access_token || !tokens.bot?.user_id) {
+
+    if (!tokens.broadcaster?.user_id || !tokens.bot?.access_token || !tokens.bot?.user_id)
         return new Response('Unauthorized - Missing Broadcaster ID or Bot Token', { status: 401 });
-    }
 
     const body = await req.json();
 
@@ -478,10 +464,11 @@ export const handleClips = async (req: BunRequest<'/clips/:channel'>) => {
 export const handleChatSend = async (req: BunRequest<'/api/chat/send'>) => {
     const tokens = await readTokensSafe();
 
-    // For Chat Bot Badge, we MUST use App Access Token
-    if (!tokens.app?.access_token) return new Response('No App Token', { status: 500 });
-    // We still need the Bot User ID for sender_id
-    if (!tokens.bot?.user_id) return new Response('No Bot User ID', { status: 500 });
+    if (!tokens.app?.access_token)
+        return new Response('No App Token', { status: 500 });
+
+    if (!tokens.bot?.user_id)
+        return new Response('No Bot User ID', { status: 500 });
 
     const body = await req.json() as {
         broadcaster_id: string;
@@ -507,12 +494,14 @@ export const handleEventSubSubscribe = async (req: BunRequest<'/api/eventsub/sub
     try {
         const body = await req.json() as any;
         const appToken = await getAppToken();
-        if (!appToken) return Response.json({ error: 'No App Token' }, { status: 500 });
+        if (!appToken)
+            return Response.json({ error: 'No App Token' }, { status: 500 });
 
         const conduitId = await getConduit();
-        if (!conduitId) return Response.json({ error: 'No Conduit ID' }, { status: 500 });
 
-        // Update transport to use conduit
+        if (!conduitId)
+            return Response.json({ error: 'No Conduit ID' }, { status: 500 });
+
         body.transport = {
             method: 'conduit',
             conduit_id: conduitId
@@ -530,7 +519,9 @@ export const handleEventSubSubscribe = async (req: BunRequest<'/api/eventsub/sub
 
         const data = await response.json();
         return Response.json(data, { status: response.status });
-    } catch (e: any) {
+    }
+
+    catch (e: any) {
         console.error('EventSub Subscribe Error:', e);
         return Response.json({ error: e.message }, { status: 500 });
     }

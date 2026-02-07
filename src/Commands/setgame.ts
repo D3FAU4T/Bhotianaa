@@ -23,10 +23,8 @@ export default <ICommand> {
 
         let gameElement: TwitchGame | undefined;
 
-        // Check if input is a number (game ID)
         const gameId = parseInt(gameInput);
 
-        // Input is a game ID
         if (!isNaN(gameId)) {
             const response = await fetch(server.url + `twitch/games?id=${gameId}`);
             const data = await response.json() as { data: TwitchGame[] };
@@ -38,14 +36,12 @@ export default <ICommand> {
 
             gameElement = data.data[0];
 
-            // Save to cache if not already present
             if (!gamesCache.find(game => game.id === gameElement!.id)) {
                 gamesCache.push(gameElement);
                 await gamesFile.write(JSON.stringify(gamesCache, null, 2));
             }
         }
 
-        // Input is a game name
         else {
             gameElement = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());
 
@@ -71,7 +67,6 @@ export default <ICommand> {
             return;
         }
 
-        // // Personalized response based on user
         if (context.userstate.user_login === 'd3fau4t')
             await client.twitch.say(
                 `Papa, Mamma is playing a new game: ${gameElement.name}`

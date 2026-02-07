@@ -31,7 +31,6 @@ export function findMathExpression(nums: readonly number[], exprs: readonly stri
             const restNums: number[] = nums.filter((_, idx) => idx !== i && idx !== j);
             const restExprs: string[] = exprs.filter((_, idx) => idx !== i && idx !== j);
 
-            // All 4 basic operations
             const ops: Operation[] = [
                 { result: a + b, expression: `(${ea}+${eb})` },
                 { result: a - b, expression: `(${ea}-${eb})` },
