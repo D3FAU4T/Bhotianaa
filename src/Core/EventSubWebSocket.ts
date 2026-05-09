@@ -16,6 +16,8 @@ export default class EventSubWebSocket {
         const url = this.reconnectUrl || 'wss://eventsub.wss.twitch.tv/ws';
 
         return new Promise((resolve, reject) => {
+            let settled = false;
+
             try {
                 this.ws = new WebSocket(url);
 
@@ -27,9 +29,9 @@ export default class EventSubWebSocket {
                     this.handleMessage(event.data);
                 };
 
+                // Don't reject immediately on error; let onclose handle reconnect attempts
                 this.ws.onerror = (error) => {
                     console.error('❌ EventSub WebSocket error:', error);
-                    reject(error);
                 };
 
                 this.ws.onclose = (event) => {
@@ -39,14 +41,23 @@ export default class EventSubWebSocket {
                     if (!this.isIntentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.reconnectAttempts++;
                         console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-                        setTimeout(() => this.connect(), 5000 * this.reconnectAttempts);
+                        setTimeout(() => this.connect().catch(err => console.error('Reconnect attempt failed:', err)), 5000 * this.reconnectAttempts);
+                    }
+                    else {
+                        if (!settled) {
+                            settled = true;
+                            reject(new Error('Max reconnect attempts reached or intentional close'));
+                        }
                     }
                 };
 
                 const welcomeHandler = (notification: EventSubNotification) => {
                     if (notification.metadata.message_type === 'session_welcome') {
                         this.reconnectAttempts = 0;
-                        resolve();
+                        if (!settled) {
+                            settled = true;
+                            resolve();
+                        }
                     }
                 };
 
@@ -60,7 +71,10 @@ export default class EventSubWebSocket {
 
             catch (error) {
                 console.error('Failed to create WebSocket:', error);
-                reject(error);
+                if (!settled) {
+                    settled = true;
+                    reject(error);
+                }
             }
         });
     }

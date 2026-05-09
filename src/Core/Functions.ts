@@ -3,7 +3,7 @@ interface Operation {
     readonly expression: string;
 }
 
-export function findMathExpression(nums: readonly number[], exprs: readonly string[], target: number): string | null {
+export const findMathExpression = (nums: readonly number[], exprs: readonly string[], target: number): string | null => {
     const Epsilon = 1e-6;
 
     if (nums.length === 1) {

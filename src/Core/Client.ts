@@ -138,7 +138,7 @@ export default class {
     }
 
     private createUserstate(event: ChatMessageEvent): ChatUserstate {
-        const isModerator = event.badges.some(b => b.set_id === 'moderator' || b.set_id === 'broadcaster');
+        const isModerator = event.badges.some(b => b.set_id === 'moderator' || b.set_id === 'broadcaster' || b.set_id === 'lead_moderator');
         const isSubscriber = event.badges.some(b => b.set_id === 'subscriber');
         const isBroadcaster = event.badges.some(b => b.set_id === 'broadcaster');
 
