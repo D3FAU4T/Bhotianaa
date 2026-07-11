@@ -92,67 +92,7 @@ const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
                     )}
                 </div>
 
-                {/* Twitch Bot */}
-                <div style={{
-                    backgroundColor: '#161b22',
-                    borderRadius: '1rem',
-                    padding: '2rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '1.5rem',
-                    border: '1px solid #9146ff',
-                    boxShadow: '0 4px 20px rgba(145, 70, 255, 0.1)'
-                }}>
 
-                    <div>
-                        <img src={twitchLogo} alt="Twitch" style={{ width: '64px', height: '64px' }} />
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Twitch Bot</h3>
-                        <p style={{ color: '#888' }}>Bot account for chat interactions and moderation.</p>
-                    </div>
-                    {accounts?.bot ? (
-                        <button
-                            onClick={() => handleDisconnect('bot')}
-                            style={{
-                                padding: '0.75rem 2rem',
-                                backgroundColor: '#d32f2f',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '0.5rem',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s',
-                                fontSize: '1rem'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                        >
-                            Disconnect
-                        </button>
-                    ) : (
-                        <a
-                            href="/auth/login/bot"
-                            style={{
-                                display: 'inline-block',
-                                padding: '0.75rem 2rem',
-                                backgroundColor: '#9146ff',
-                                color: 'white',
-                                textDecoration: 'none',
-                                borderRadius: '0.5rem',
-                                fontWeight: '600',
-                                transition: 'transform 0.2s',
-                                cursor: 'pointer',
-                                fontSize: '1rem'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                        >
-                            Connect
-                        </a>
-                    )}
-                </div>
 
                 {/* Spotify Placeholder */}
                 <div style={{

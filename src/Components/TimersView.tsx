@@ -17,7 +17,7 @@ const TimersView = ({ timers, ws }: TimersViewProps) => {
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
-                action: 'createTimer',
+                action: 'create',
                 name: newTimerName.trim(),
                 message: newTimerMessage.trim(),
                 interval: Math.max(1, Math.floor(interval))
@@ -31,7 +31,7 @@ const TimersView = ({ timers, ws }: TimersViewProps) => {
     const handleDeleteTimer = (name: string) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
-                action: 'deleteTimer',
+                action: 'delete',
                 name
             }));
         }
@@ -40,7 +40,7 @@ const TimersView = ({ timers, ws }: TimersViewProps) => {
     const handleToggleTimer = (name: string) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
-                action: 'toggleTimer',
+                action: 'toggle',
                 name
             }));
         }
@@ -66,7 +66,7 @@ const TimersView = ({ timers, ws }: TimersViewProps) => {
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
-                action: 'updateTimer',
+                action: 'update',
                 name: editingTimer,
                 message: newTimerMessage.trim(),
                 interval: Math.max(1, Math.floor(interval))

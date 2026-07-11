@@ -1,16 +1,31 @@
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand, } from '../Typings/Bhotianaa';
+import type { Command, } from '../Typings/Bhotianaa';
 
-export default <ICommand> {
+export default <Command> {
     name: "bomb",
     description: "Send a bomb emote when someone bombs anyone on stream, to amplify the mood",
-    execute: async (context: CommandContext, client: Bhotianaa) => {
-        const name = context.args[0]?.toLowerCase();
+    aliases: null,
+    roles: ['broadcaster', 'moderator', 'lead_moderator', 'subscriber', 'vip', 'viewer'],
+    execute: async (notification, client, _sharedContext) => {
 
-        if (name?.includes('bhotiana') || name?.includes('gianaa'))
-            await client.twitch.say('No T^T');
+        const args = notification.event.message.text.split(' ');
+
+        if (!args[1])
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: !bomb <username>`
+            );
+
+        const name = args[1].replace('@', '').toLowerCase();
+
+        const exclusionList = ['bhotiana', 'gianaa_'];
+
+        if (exclusionList.includes(name))
+            await client.reply(
+                notification.event.message_id,
+                'No T^T'
+            );
 
         else
-            await client.twitch.say('gianaaBomb 💥');
+            await client.say(`@${name} gianaaBomb 💥`);
     }
 }

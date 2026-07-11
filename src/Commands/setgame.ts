@@ -1,85 +1,79 @@
 import path from 'node:path';
-import { server } from '../..';
-import type Bhotianaa from '../Core/Client';
-import type { TwitchGame } from '../Typings/TwitchAPI';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand> {
+type Unwrapped = Awaited<ReturnType<typeof Helix.Games.get>>;
+type ExtractData<T> = T extends { is_success: true; data: infer D } ? D : never;
+
+export default <Command>{
     name: 'setgame',
     description: 'Sets the game of the stream',
-    moderatorOnly: true,
-    streamerOnly: true,
+    roles: ['broadcaster', 'lead_moderator', 'moderator'],
     aliases: ['game'],
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const gameInput = context.args.join(' ');
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        const command = args.shift();
 
-        if (!gameInput) {
-            await client.twitch.say('Usage: !setgame <game name or ID>');
-            return;
-        }
+        const gameInput = args.join(' ');
 
-        const gamesFile = Bun.file(path.resolve('src', 'Cache', 'games.json'));
-        const gamesCache = await gamesFile.exists() ? await gamesFile.json() as TwitchGame[] : [];
-
-        let gameElement: TwitchGame | undefined;
-
-        const gameId = parseInt(gameInput);
-
-        if (!isNaN(gameId)) {
-            const response = await fetch(server.url + `twitch/games?id=${gameId}`);
-            const data = await response.json() as { data: TwitchGame[] };
-
-            if (data.data.length === 0 || !data.data[0]) {
-                await client.twitch.say(`Game with ID "${gameId}" not found.`);
-                return;
-            }
-
-            gameElement = data.data[0];
-
-            if (!gamesCache.find(game => game.id === gameElement!.id)) {
-                gamesCache.push(gameElement);
-                await gamesFile.write(JSON.stringify(gamesCache, null, 2));
-            }
-        }
-
-        else {
-            gameElement = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());
-
-            if (!gameElement) {
-                const response = await fetch(server.url + `twitch/games?name=${encodeURIComponent(gameInput)}`);
-                const data = await response.json() as { data: TwitchGame[] };
-                if (data.data.length === 0 || !data.data[0]) {
-                    await client.twitch.say(`Game \"${gameInput}\" not found.`);
-                    return;
-                }
-
-                gameElement = data.data[0];
-            }
-        }
-
-        const response = await fetch(server.url + 'twitch/channels', {
-            method: 'PATCH',
-            body: JSON.stringify({ game_id: gameElement.id })
-        });
-
-        if (!response.ok) {
-            await client.twitch.say(`Failed to set game: ${response.status} ${response.statusText}`);
-            return;
-        }
-
-        if (context.userstate.user_login === 'd3fau4t')
-            await client.twitch.say(
-                `Papa, Mamma is playing a new game: ${gameElement.name}`
+        if (!gameInput)
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: ${command} <game_name>`
             );
 
-        else if (context.userstate.user_login === 'gianaa_')
-            await client.twitch.say(
-                `Papa, Mamma is playing a new game: ${gameElement.name}`
+        const gamesFile = Bun.file(path.resolve('src', 'Cache', 'games.json'));
+        const gamesCache = await gamesFile.exists() ? await gamesFile.json() as ExtractData<Unwrapped> : [];
+
+        let game = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());
+
+        if (!game) {
+            const res = await Helix.Games.get(
+                { name: gameInput },
+                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+            );
+
+            if (!res.is_success || !res.data[0])
+                return await client.reply(
+                    notification.event.message_id,
+                    `Game "${gameInput}" not found.`
+                );
+
+            game = res.data[0];
+            gamesCache.push(game);
+            await gamesFile.write(JSON.stringify(gamesCache, null, 2));
+        }
+
+        const response = await Helix.Channel.patch(
+            Bun.env.BROADCASTER_USER_ID,
+            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
+            { game_id: game.id }
+        );
+
+        if (!response.is_success)
+            return await client.reply(
+                notification.event.message_id,
+                `Failed to set game: ${response.error}`
+            );
+
+        const username = notification.event.chatter_user_name.toLowerCase();
+
+        if (username === 'd3fau4t')
+            await client.reply(
+                notification.event.message_id,
+                `Papa, Mamma is playing a new game: ${game.name}`
+            );
+
+        else if (username === 'gianaa_')
+            await client.reply(
+                notification.event.message_id,
+                `Mamma, I updated the game to ${game.name}`
             );
 
         else
-            await client.twitch.say(
-                `New game: ${gameElement.name}`
+            await client.announce(
+                `EVERYONE! Mamma is playing a new game: ${game.name}`,
+                "blue"
             );
     }
 };

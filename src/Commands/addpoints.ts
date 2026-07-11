@@ -1,31 +1,40 @@
-import type { ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand> {
+export default <Command>{
     name: 'addpoints',
     aliases: ['grantpoints'],
-    description: 'Grant points to a user (Broadcaster/Moderator only)',
-    moderatorOnly: true,
-    streamerOnly: false,
+    description: 'Grant points to a user',
+    roles: ['broadcaster', 'lead_moderator', 'moderator'],
 
-    async execute({ userstate, args }, client) {
-        if (args.length < 2) {
-            await client.twitch.say(`@${userstate.user_login} Usage: !addpoints <username> <amount>`);
-            return;
-        }
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
 
-        const targetUsername = args[0]!.toLowerCase().replace('@', '');
-        const amount = parseInt(args[1]!);
+        if (!args[1] || !args[2])
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: !addpoints <username> <amount>`
+            );
 
-        if (isNaN(amount) || amount <= 0) {
-            await client.twitch.say(`@${userstate.user_login} Please provide a valid positive number for points.`);
-            return;
-        }
+        const targetUsername = args[1].toLowerCase().replace('@', '');
+        const amount = parseInt(args[2]);
 
-        const targetUserId = await client.twitch.getUserId(targetUsername);
+        if (isNaN(amount) || amount <= 0)
+            return await client.reply(
+                notification.event.message_id,
+                `Please provide a valid positive number for points.`
+            );
 
-        if (!targetUserId) {
-            await client.twitch.say(`@${userstate.user_login} User "${targetUsername}" not found.`);
-            return;
+        const targetUserId = await Helix.Users.get(
+            { names: [targetUsername] },
+            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+        );
+
+        if (!targetUserId.is_success || !targetUserId.data[0]) {
+            return await client.reply(
+                notification.event.message_id,
+                `User "${targetUsername}" not found.`
+            );
         }
 
         try {
@@ -35,16 +44,22 @@ export default <ICommand> {
             if (await pointsFile.exists())
                 pointsData = await pointsFile.json();
 
-            const currentPoints = pointsData[targetUserId] || 0;
-            pointsData[targetUserId] = currentPoints + amount;
+            const currentPoints = pointsData[targetUserId.data[0].id] || 0;
+            pointsData[targetUserId.data[0].id] = currentPoints + amount;
 
-            await Bun.write('./src/Config/points.json', JSON.stringify(pointsData, null, 2));
-            await client.twitch.say(`@${userstate.user_login} Successfully granted ${amount} points to @${targetUsername}! New balance: ${pointsData[targetUserId]} points`);
+            await pointsFile.write(JSON.stringify(pointsData, null, 2));
+            await client.reply(
+                notification.event.message_id,
+                `Successfully granted ${amount} points to @${targetUsername}! New balance: ${pointsData[targetUserId.data[0].id]} points`
+            );
         }
 
         catch (error) {
             console.error('Error adding points:', error);
-            await client.twitch.say(`@${userstate.user_login} Failed to grant points. Please try again.`);
+            await client.reply(
+                notification.event.message_id,
+                `Failed to grant points. Please try again.`
+            );
         }
     }
 };

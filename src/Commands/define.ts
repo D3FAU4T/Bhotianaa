@@ -1,31 +1,36 @@
-import { server } from '../..';
-import type Bhotianaa from '../Core/Client';
-import type { dictionaryAPI } from '../Typings/definitions';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import type { Command } from '../Typings/Bhotianaa';
+import type { DictionaryAPI, DictionaryAPIError } from '../Typings/DictionaryAPI';
 
-export default <ICommand> {
+export default <Command> {
     name: 'define',
     description: 'Defines a word',
     aliases: ['def', 'wtfis'],
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const word = context.args.join(' ');
-        if (!word) {
-            await client.twitch.say('Usage: !def <word>');
-            return;
-        }
+    roles: ['broadcaster', 'moderator', 'lead_moderator', 'subscriber', 'vip', 'viewer'],
+    async execute(notification, client, _sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        const command = args.shift();
 
-        const response = await fetch(`${server.url}define/${word}`);
-        const result = await response.json() as dictionaryAPI[];
-        
-        if (!Array.isArray(result)) {
-            await client.twitch.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
-            return;
-        }
+        if (!args[0])
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: ${command} <word>`,
+            )
+
+        const word = args.join(' ').trim();
+
+        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const result = await response.json() as DictionaryAPI[] | DictionaryAPIError;
+
+        if (!Array.isArray(result))
+            return await client.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
 
         if (result[0] && result[0].meanings[0] && result[0].meanings[0].definitions[0])
-            await client.twitch.say(`${word}: ${result[0].meanings[0].definitions[0].definition}`);
+            await client.reply(
+                notification.event.message_id,
+                `${word}: ${result[0].meanings[0].definitions[0].definition}`
+            );
 
         else
-            await client.twitch.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
+            await client.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
     }
 };

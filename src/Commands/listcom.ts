@@ -1,20 +1,19 @@
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand>{
+export default <Command>{
     name: 'listcom',
     description: 'List all dynamic commands',
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { userstate } = context;
-
-        if (client.dynamicCommands.size === 0) {
-            await client.twitch.say(`@${userstate.user_name} No dynamic commands available.`);
+    aliases: ['listcommands', 'commands'],
+    roles: ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'],
+    execute: async (notification, client, sharedContext) => {
+        if (sharedContext.commands.dynamic.size === 0) {
+            await client.reply(notification.event.message_id, `No dynamic commands available.`);
             return;
         }
 
-        const commandNames = Array.from(client.dynamicCommands.keys()).map(name => `!${name}`);
+        const commandNames = Array.from(sharedContext.commands.dynamic.keys()).map(name => `!${name}`);
         const commandList = commandNames.join(', ');
 
-        await client.twitch.say(`@${userstate.user_name} Dynamic commands: ${commandList}`);
+        await client.reply(notification.event.message_id, `Dynamic commands: ${commandList}`);
     }
 };

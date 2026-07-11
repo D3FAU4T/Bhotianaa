@@ -1,28 +1,34 @@
-import type { ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand> {
+export default <Command>{
     name: 'points',
     aliases: ['balance', 'checkpoints'],
     description: 'Check your current points balance',
-    moderatorOnly: false,
-    streamerOnly: false,
+    roles: ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'],
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        args.shift();
 
-    async execute({ userstate, args }, client) {
         try {
-            let targetUsername = userstate.user_login;
-            let targetUserId = userstate.user_id;
+            let targetUsername = notification.event.chatter_user_name;
+            let targetUserId = notification.event.chatter_user_id;
 
             // Allow checking other users' points
-            if (args.length > 0) {
-                targetUsername = args[0]!.toLowerCase().replace('@', '');
-                const userId = await client.twitch.getUserId(targetUsername);
+            if (args[0]) {
+                targetUsername = args[0].toLowerCase().replace('@', '');
+                const userId = await Helix.Users.get(
+                    { names: [targetUsername] },
+                    { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
+                );
 
-                if (!userId) {
-                    await client.twitch.say(`@${userstate.user_login} User "${targetUsername}" not found.`);
-                    return;
-                }
+                if (!userId.is_success || !userId.data[0])
+                    return await client.reply(
+                        notification.event.message_id,
+                        `User "${targetUsername}" not found.`
+                    );
 
-                targetUserId = userId;
+                targetUserId = userId.data[0].id;
             }
 
             const pointsFile = Bun.file('./src/Config/points.json');
@@ -33,16 +39,25 @@ export default <ICommand> {
 
             const points = pointsData[targetUserId] || 0;
 
-            if (targetUserId === userstate.user_id)
-                await client.twitch.say(`@${userstate.user_login} You have ${points} points!`);
+            if (targetUserId === notification.event.chatter_user_id)
+                await client.reply(
+                    notification.event.message_id,
+                    `You have ${points} points!`
+                );
 
             else
-                await client.twitch.say(`@${userstate.user_login} ${targetUsername} has ${points} points!`);
+                await client.reply(
+                    notification.event.message_id,
+                    `${targetUsername} has ${points} points!`
+                );
         }
 
         catch (error) {
             console.error('Error checking points:', error);
-            await client.twitch.say(`@${userstate.user_login} Failed to check points. Please try again.`);
+            await client.reply(
+                notification.event.message_id,
+                `Failed to check points. Please try again.`
+            );
         }
     }
 };

@@ -1,9 +1,7 @@
 import React from "react";
 import { useEffect, useRef, useState } from "react";
-import type { CommandContext } from "../Typings/Bhotianaa";
-
 type Props = {
-    messages: Omit<CommandContext, 'args'>[];
+    messages: any[];
     ws: WebSocket | null;
 }
 
@@ -66,6 +64,8 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
         }
     };
 
+    const [replyingTo, setReplyingTo] = useState<{ messageId: string; chatterName: string; text: string } | null>(null);
+
     const handleScrollToBottomClick = () => {
         setIsScrollPaused(false);
         setShowScrollButton(false);
@@ -74,8 +74,13 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
 
     const sendMessage = () => {
         if (messageInput.trim() && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ message: messageInput }));
+            const payload: any = { message: messageInput };
+            if (replyingTo) {
+                payload.replyParentMessageId = replyingTo.messageId;
+            }
+            ws.send(JSON.stringify(payload));
             setMessageInput("");
+            setReplyingTo(null);
         }
     };
 
@@ -86,11 +91,11 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
         }
     };
 
-    const renderBadges = (userstate: any) => {
-        if (!userstate.badges || !Array.isArray(userstate.badges)) return null;
+    const renderBadges = (msg: any) => {
+        if (!msg.badges || !Array.isArray(msg.badges)) return null;
 
         const badges = [];
-        for (const badge of userstate.badges) {
+        for (const badge of msg.badges) {
             const badgeName = badge.set_id;
             const badgeId = badge.id;
 
@@ -217,17 +222,62 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
             <div className="chatbox" ref={chatboxRef} onScroll={handleScroll}>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                     {messages.map((msg, index) => (
-                        <>
-                            <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                                {renderBadges(msg.userstate)}
-                                <strong style={{ color: msg.userstate.color, marginRight: '4px' }}>
-                                    {msg.userstate.user_name}:
-                                </strong>
-                                <span style={{ wordBreak: 'break-word', flex: 1 }}>
-                                    {parseMessage(msg.message, {})}
-                                </span>
-                            </div>
-                        </>
+                        <div 
+                            key={index} 
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                marginBottom: '4px',
+                                position: 'relative',
+                                paddingRight: '32px'
+                            }}
+                        >
+                            {renderBadges(msg)}
+                            <strong style={{ color: msg.color || '#9146ff', marginRight: '4px' }}>
+                                {msg.chatter_user_name || msg.chatter_user_login}:
+                            </strong>
+                            <span style={{ wordBreak: 'break-word', flex: 1 }}>
+                                {parseMessage(msg.message?.text || msg.message || "", {})}
+                            </span>
+                            {msg.message_id && (
+                                <button
+                                    type="button"
+                                    title="Reply"
+                                    onClick={() => setReplyingTo({
+                                        messageId: msg.message_id,
+                                        chatterName: msg.chatter_user_name || msg.chatter_user_login,
+                                        text: msg.message?.text || msg.message || ""
+                                    })}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '4px',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#666',
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '2px 4px',
+                                        borderRadius: '4px',
+                                        transition: 'color 0.2s, background-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.color = '#7d2ee0';
+                                        e.currentTarget.style.backgroundColor = 'rgba(125, 46, 224, 0.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.color = '#666';
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="9 17 4 12 9 7"></polyline>
+                                        <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
                     ))}
                 </div>
             </div>
@@ -239,6 +289,38 @@ const Chatbox = ({ messages, ws }: Props & { style?: React.CSSProperties }) => {
                 >
                     Scroll to bottom
                 </button>
+                {replyingTo && (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: '#1f242e',
+                        borderLeft: '4px solid #7d2ee0',
+                        padding: '6px 12px',
+                        fontSize: '0.85rem',
+                        color: '#bbb',
+                        borderRadius: '4px 4px 0 0',
+                        marginBottom: '2px'
+                    }}>
+                        <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}>
+                            Replying to <strong style={{ color: '#7d2ee0' }}>@{replyingTo.chatterName}</strong>: <span style={{ fontStyle: 'italic' }}>"{replyingTo.text}"</span>
+                        </div>
+                        <button 
+                            onClick={() => setReplyingTo(null)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#d32f2f',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: 'bold',
+                                marginLeft: '10px'
+                            }}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
                 <div className="chat">
                     <textarea
                         placeholder="Send message as bot"

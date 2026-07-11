@@ -1,14 +1,13 @@
 import Chatbox from "./Chatbox";
 import CommandBlock from "./CommandBlock";
 import { useEffect, useRef, useState } from "react";
-import type { CommandContext } from "../Typings/Bhotianaa";
 import DynamicCommandsView from "./DynamicCommandsView";
 import SystemCommandsView from "./SystemCommandsView";
 import TimersView from "./TimersView";
 import AccountsView from "./AccountsView";
 
 const App = () => {
-    const [messages, setMessages] = useState<Omit<CommandContext, 'args'>[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
     const [expandedBlock, setExpandedBlock] = useState<string | null>(null);
     const [dynamicCommands, setDynamicCommands] = useState<Record<string, any>>({});
 
@@ -26,6 +25,7 @@ const App = () => {
 
     const ws = useRef<WebSocket | null>(null);
     const commandsWs = useRef<WebSocket | null>(null);
+    const timersWs = useRef<WebSocket | null>(null);
 
     const handleBlockClick = (blockType: string) => {
         setExpandedBlock(blockType);
@@ -48,8 +48,8 @@ const App = () => {
     };
 
     const fetchTimers = () => {
-        if (commandsWs.current && commandsWs.current.readyState === WebSocket.OPEN) {
-            commandsWs.current.send(JSON.stringify({ action: 'getAllTimers' }));
+        if (timersWs.current && timersWs.current.readyState === WebSocket.OPEN) {
+            timersWs.current.send(JSON.stringify({ action: 'getAll' }));
         }
     };
 
@@ -60,7 +60,7 @@ const App = () => {
             case 'commands':
                 return <SystemCommandsView systemCommands={systemCommands} />;
             case 'timers':
-                return <TimersView timers={timers} ws={commandsWs.current} />;
+                return <TimersView timers={timers} ws={timersWs.current} />;
             case 'accounts':
                 return <AccountsView accounts={accounts} onRefresh={fetchAccounts} />;
             default:
@@ -114,8 +114,7 @@ const App = () => {
                 return;
             }
 
-            // Handle chat messages
-            const data = JSON.parse(messageStr) as Omit<CommandContext, 'args'>;
+            const data = JSON.parse(messageStr) as any;
             setMessages(prev => {
                 const newMessages = [...prev, data];
                 if (newMessages.length > 100) {
@@ -144,10 +143,14 @@ const App = () => {
         }
 
         commandsWs.current = new WebSocket(`ws://${window.location.host}/socket/commands`);
+        timersWs.current = new WebSocket(`ws://${window.location.host}/socket/timers`);
 
         commandsWs.current.onopen = () => {
             fetchDynamicCommands();
             fetchSystemCommands();
+        };
+
+        timersWs.current.onopen = () => {
             fetchTimers();
         };
 
@@ -167,9 +170,6 @@ const App = () => {
             else if (data.type === 'systemCommands')
                 setSystemCommands(data.commands);
 
-            else if (data.type === 'allTimers')
-                setTimers(data.timers);
-
             else if (data.type === 'streamInfo')
                 setStreamInfo(data.data);
 
@@ -177,7 +177,27 @@ const App = () => {
                 console.error('Commands error:', data.error)
         };
 
-        return () => commandsWs.current?.close();
+        timersWs.current.onmessage = (event) => {
+            const messageStr = event.data;
+
+            // Handle heartbeat - server sends 6, we respond with 9
+            if (messageStr === '6') {
+                timersWs.current?.send('9');
+                return;
+            }
+
+            const data = JSON.parse(messageStr);
+            if (data.type === 'allTimers')
+                setTimers(data.timers);
+
+            else if (data.error)
+                console.error('Timers error:', data.error)
+        };
+
+        return () => {
+            commandsWs.current?.close();
+            timersWs.current?.close();
+        };
     }, []);
 
     // Drag and Drop Handlers

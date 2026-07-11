@@ -1,32 +1,42 @@
-import type { ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand> {
+export default <Command>{
     name: 'removepoints',
-    aliases: ['takepoints', 'deductpoints'],
     description: 'Remove points from a user (Broadcaster/Moderator only)',
-    moderatorOnly: true,
-    streamerOnly: false,
+    aliases: ['takepoints', 'deductpoints', 'rempoints', 'rmpoints', 'rmpts', 'rmpoints'],
+    roles: ['broadcaster', 'lead_moderator', 'moderator'],
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        args.shift();
 
-    async execute({ userstate, args }, client) {
-        if (args.length < 2) {
-            await client.twitch.say(`@${userstate.user_login} Usage: !removepoints <username> <amount>`);
-            return;
-        }
+        if (!args[0] || !args[1])
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: !removepoints <username> <amount>`
+            );
 
-        const targetUsername = args[0]!.toLowerCase().replace('@', '');
-        const amount = parseInt(args[1]!);
+        const targetUsername = args[0].toLowerCase().replace('@', '');
+        const amount = parseInt(args[1]);
 
-        if (isNaN(amount) || amount <= 0) {
-            await client.twitch.say(`@${userstate.user_login} Please provide a valid positive number for points.`);
-            return;
-        }
+        if (isNaN(amount) || amount <= 0)
+            return await client.reply(
+                notification.event.message_id,
+                `Please provide a valid positive number for points.`
+            );
 
         // Get user ID from username
-        const targetUserId = await client.twitch.getUserId(targetUsername);
-        if (!targetUserId) {
-            await client.twitch.say(`@${userstate.user_login} User "${targetUsername}" not found.`);
-            return;
-        }
+
+        const userId = await Helix.Users.get(
+            { names: [targetUsername] },
+            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
+        );
+
+        if (!userId.is_success || !userId.data[0])
+            return await client.reply(
+                notification.event.message_id,
+                `User "${targetUsername}" not found.`
+            );
 
         try {
             const pointsFile = Bun.file('./src/Config/points.json');
@@ -35,18 +45,24 @@ export default <ICommand> {
             if (await pointsFile.exists())
                 pointsData = await pointsFile.json();
 
-            const currentPoints = pointsData[targetUserId] || 0;
+            const currentPoints = pointsData[userId.data[0].id] || 0;
             const newPoints = Math.max(0, currentPoints - amount);
-            pointsData[targetUserId] = newPoints;
+            pointsData[userId.data[0].id] = newPoints;
 
             await Bun.write('./src/Config/points.json', JSON.stringify(pointsData, null, 2));
 
-            await client.twitch.say(`@${userstate.user_login} Successfully removed ${amount} points from @${targetUsername}! New balance: ${pointsData[targetUserId]} points`);
+            await client.reply(
+                notification.event.message_id,
+                `Successfully removed ${amount} points from @${targetUsername}! New balance: ${pointsData[userId.data[0].id]} points`
+            );
         }
 
         catch (error) {
             console.error('Error removing points:', error);
-            await client.twitch.say(`@${userstate.user_login} Failed to remove points. Please try again.`);
+            await client.reply(
+                notification.event.message_id,
+                `Failed to remove points. Please try again.`
+            );
         }
     }
 };

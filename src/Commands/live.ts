@@ -1,29 +1,37 @@
-import { server } from "../..";
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from "../Typings/Bhotianaa";
-import type { TwitchChannel } from "../Typings/TwitchAPI";
+import { Helix } from "twitch";
+import type { Command } from "../Typings/Bhotianaa";
 
-export default <ICommand>{
+export default <Command> {
     name: 'live',
     description: 'Sends a live notification to the discord channel',
-    aliases: ['announce'],
-    moderatorOnly: true,
-    streamerOnly: true,
-    execute: async (context: CommandContext, client: Bhotianaa) => {
-        const channelFetch = await fetch(server.url + `twitch/channels?broadcaster_id=${client.broadcasterId}`);
-        const channelData = channelFetch.ok ? await channelFetch.json() as { data: TwitchChannel[] } : null;
+    aliases: null,
+    roles: ['broadcaster', 'lead_moderator', 'moderator'],
+    execute: async (notification, client, sharedContext) => {
 
-        if (!channelData) {
-            await client.twitch.say(`Mamma, I couldn't retrieve your channel data. Can you wait a little bit for the Twitch API to update your channel data?`);
+        const result = await Helix.Channel.get(Bun.env.BROADCASTER_USER_ID, {
+            clientId: Bun.env.TWITCH_CLIENT_ID,
+            accessToken: sharedContext.env.broadcaster.access_token
+        });
+
+        if (!result.is_success) {
+            await client.say(`Error fetching channel data. Check console for details.`);
+            console.error(result.error);
             return;
         }
+   
+        const data = result.data[0];
 
+        if (!data) {
+            await client.say(`Error fetching channel data. Check console for details.`);
+            return;
+        }
+       
         const payload = {
-            content: `@everyone My Mamma is live on twitch and streaming ${channelData.data[0]?.game_name}`,
+            content: `@everyone My Mamma is live on twitch and streaming ${data.game_name}`,
             embeds: [
                 {
                     title: "Streaming time!",
-                    description: `${channelData.data[0]?.title}`,
+                    description: `${data.title}`,
                     url: "https://twitch.tv/gianaa_",
                     color: 11342935,
                     thumbnail: {
@@ -41,7 +49,7 @@ export default <ICommand>{
                         icon_url: "https://images-ext-1.discordapp.net/external/xeu1afV92cXfj9ICm7f0Ll52ughrWfj4RR5MHv0S_Kg/https/cdn.discordapp.com/icons/1005194560303013920/581e47ff8e43bd2680c160bf1c21fa33.webp"
                     },
                     fields: [
-                        { name: "Game", value: `${channelData.data[0]?.game_name}`, inline: true },
+                        { name: "Game", value: `${data.game_name}`, inline: true },
                         { name: "Viewers Count", value: 3, inline: true }
                     ]
                 }
@@ -55,9 +63,15 @@ export default <ICommand>{
         });
 
         if (!discordNotification.ok) {
-            await client.twitch.say(`Mamma, I couldn't send the live notification to Discord. Please check the webhook URL or call Papa.`);
+            await client.reply(
+                notification.event.message_id,
+                `Mamma, I couldn't send the live notification to Discord. Please check the webhook URL or call Papa.`
+            );
         }
 
-        else await client.twitch.say(`Mamma, I sent the live notification to Discord!`);
+        else await client.reply(
+            notification.event.message_id,
+            `Mamma, I sent the live notification to Discord!`
+        );
     }
 }

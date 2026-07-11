@@ -1,43 +1,55 @@
-import { server } from '../..';
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand>{
+export default <Command> {
     name: 'settitle',
     description: 'Sets the title of the stream',
-    moderatorOnly: true,
-    streamerOnly: true,
+    roles: ['broadcaster', 'lead_moderator', 'moderator'],
     aliases: ['title'],
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const title = context.args.join(' ');
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        const command = args.shift();
 
-        if (!title) {
-            await client.twitch.say('Usage: !settitle <title>');
-            return;
-        }
+        const title = args.join(' ');
 
-        const response = await fetch(server.url + 'twitch/channels', {
-            method: 'PATCH',
-            body: JSON.stringify({ title })
-        });
+        if (!title)
+            return await client.reply(
+                notification.event.message_id,
+                `Usage: ${command} <title>`
+            );
 
-        if (!response.ok) {
-            await client.twitch.say(`Failed to set title: ${response.status} ${response.statusText}`);
-            return;
-        }
+        const response = await Helix.Channel.patch(
+            Bun.env.BROADCASTER_USER_ID,
+            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
+            { title }
+        )
+        
+
+        if (!response.is_success)
+            return await client.reply(
+                notification.event.message_id,
+                `Failed to set title: ${response.error}`
+            );
 
         // Personalized response based on user
-        if (context.userstate.user_login === 'd3fau4t')
-            await client.twitch.say(
+        const username = notification.event.chatter_user_login.toLowerCase();
+
+        if (username === 'd3fau4t')
+            await client.reply(
+                notification.event.message_id,
                 `Papa! look, I changed the title to "${title}" VoHiYo`
             );
 
-        else if (context.userstate.user_login === 'gianaa_')
-            await client.twitch.say(
+        else if (username === 'gianaa_')
+            await client.reply(
+                notification.event.message_id,
                 `Mamma! I updated the title to "${title}" :)) <3`
             );
 
         else
-            await client.twitch.say(`New title: \"${title}\"`);
+            await client.reply(
+                notification.event.message_id,
+                `New title: "${title}"`
+            );
     }
 };

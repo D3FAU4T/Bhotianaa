@@ -1,38 +1,36 @@
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand>{
+export default <Command> {
     name: 'link',
     description: 'Sets the temporary link or get it',
-    aliases: ['mirror', 'wos', 'gos'],
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const url = context.args[0];
+    aliases: ['mirror', 'wos', 'gos', 'ml'],
+    roles: ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'],
+    async execute(notification, client, sharedContext) {
+        const args = notification.event.message.text.split(' ');
+        const command = args.shift();
 
-        if (!url) {
-            // Get current link
-            const currentLink = client.state.temporaryLink || 'No link set';
-            await client.twitch.say(currentLink);
-            return;
+        const modRoles = ['broadcaster', 'lead_moderator', 'moderator'];
+        const isMod = notification.event.badges.some(badge => modRoles.includes(badge.set_id));
+        const url = args[0];
+
+        if (isMod) {
+            if (!url && sharedContext.link)
+                await client.reply(notification.event.message_id, sharedContext.link);
+            else if (!url && !sharedContext.link)
+                await client.reply(notification.event.message_id, `No link set. Usage: ${command} <URL>`);
+            else if (url) {
+                sharedContext.link = url;
+                await client.reply(notification.event.message_id, `Link updated to: ${url}`);
+            }
         }
 
-        // Check if user has permissions to set link
-        const hasPermissions = client.hasModPermissions(context.userstate);
-        if (!hasPermissions) {
-            await client.twitch.say(`@${context.userstate.user_login} You don't have permission to use this command`);
-            return;
+        else {
+            if (!url && sharedContext.link)
+                await client.reply(notification.event.message_id, sharedContext.link);
+            else if (!url && !sharedContext.link)
+                await client.reply(notification.event.message_id, `No link set. Ask a moderator to set it.`);
+            else if (url)
+                await client.reply(notification.event.message_id, `Only moderators can set the link.`);
         }
-
-        // Set the link
-        client.setLink(url);
-
-        // Personalized response
-        if (context.userstate.user_login === 'gianaa_')
-            await client.twitch.say('Updated the link, mamma :))');
-
-        else if (context.userstate.user_login === 'd3fau4t')
-            await client.twitch.say('Updated the link, papa 🙃');
-
-        else
-            await client.twitch.say('Updated the link :>');
     }
 };

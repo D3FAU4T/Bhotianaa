@@ -1,23 +1,23 @@
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import { loadTimers } from "../Core/Functions";
+import type { Command } from "../Typings/Bhotianaa";
 
-export default <ICommand>{
+export default <Command>{
     name: 'timers',
     description: 'List all active timers',
     aliases: ['timer'],
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { userstate } = context;
-
-        if (client.timers.size === 0) {
-            await client.twitch.say(`@${userstate.user_name} No timers available.`);
+    roles: ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'],
+    execute: async (notification, client, sharedContext) => {
+        if (sharedContext.timers.size === 0) {
+            await client.reply(notification.event.message_id, `No timers available.`);
             return;
         }
 
-        const timerInfo = Array.from(client.timers.values()).map(timer =>
-            `${timer.name} (${timer.interval}min, ${timer.enabled ? 'ON' : 'OFF'})`
+        const timerInfo = (await loadTimers()).map(timer =>
+            `${timer.name} (${timer.intervalMs / 60000}min, ${timer.enabled ? 'ON' : 'OFF'})`
         );
+        
         const timerList = timerInfo.join(', ');
 
-        await client.twitch.say(`@${userstate.user_name} Timers: ${timerList}`);
+        await client.reply(notification.event.message_id, `Timers: ${timerList}`);
     }
 };

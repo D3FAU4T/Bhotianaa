@@ -1,14 +1,17 @@
 import path from 'node:path';
 import { CSRF, type BunRequest } from 'bun';
-import type { TwitchAuth, TwitchUser } from '../Typings/TwitchAPI';
-import { events } from './Events';
+import { Auth } from 'twitch';
+import { EventEmitter } from 'node:events';
+import type { TwitchAuth } from '../Typings/TwitchAPI';
+
+export const events = new EventEmitter();
 
 const getTokenFile = () => Bun.file(path.resolve('src', 'Config', 'tokens.json'));
 
 export interface TokenStore {
     broadcaster: (TwitchAuth & { user_id?: string }) | null;
     bot: (TwitchAuth & { user_id?: string }) | null;
-    app: TwitchAuth | null;
+    app: string | null;
     conduit_id?: string;
 }
 
@@ -56,7 +59,7 @@ export const handleLogin = async (req: BunRequest<'/auth/login/:type'>) => {
     const state = CSRF.generate(Bun.env.CSRF_SECRET);
 
     const scopesFile = await Bun.file(path.resolve('src', 'Config', 'scopes.json')).json() as { broadcaster: string[], app: string[] };
-    const scopeList = type === 'broadcaster' ? scopesFile.broadcaster : scopesFile.app; // 'app' in scopes.json seems to be for bot user
+    const scopeList = type === 'broadcaster' ? scopesFile.broadcaster : scopesFile.app;
 
     const params = new URLSearchParams({
         client_id: Bun.env.TWITCH_CLIENT_ID,
@@ -91,438 +94,37 @@ export const handleDisconnect = async (req: BunRequest<'/auth/disconnect/:type'>
 export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
     const type = req.cookies.get('auth_type') as 'broadcaster' | 'bot' | undefined;
 
     if (!code) return new Response('No code provided', { status: 400 });
     if (!type || (type !== 'broadcaster' && type !== 'bot')) return new Response('Invalid or expired session (missing auth_type cookie)', { status: 400 });
 
-    const tokenResponse = await fetch('https://id.twitch.tv/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            client_id: Bun.env.TWITCH_CLIENT_ID!,
-            client_secret: Bun.env.TWITCH_CLIENT_SECRET!,
-            code,
-            grant_type: 'authorization_code',
-            redirect_uri: new URL('/auth/callback', req.url).toString()
-        })
+    const redirectUri = new URL('/auth/callback', req.url).toString();
+
+    const tokenResponse = await Auth.authorizationCodeGrantFlow({
+        clientId: Bun.env.TWITCH_CLIENT_ID!,
+        clientSecret: Bun.env.TWITCH_CLIENT_SECRET!,
+        code,
+        redirectUri
     });
 
-    if (!tokenResponse.ok) {
-        return Response.json(await tokenResponse.json(), { status: tokenResponse.status });
+    if ('error' in tokenResponse) {
+        return Response.json(tokenResponse, { status: 400 });
     }
 
-    const tokens = await tokenResponse.json() as TwitchAuth;
+    const tokens = tokenResponse as TwitchAuth;
     const currentTokens = await readTokensSafe();
 
-    const userResponse = await fetch('https://api.twitch.tv/helix/users', {
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.access_token}`
-        }
-    });
-
-    if (userResponse.ok) {
-        const userData = await userResponse.json() as { data: TwitchUser[] };
-
-        if (userData.data.length > 0)
-            currentTokens[type] = { ...tokens, user_id: userData.data[0]?.id };
-        else
-            currentTokens[type] = { ...tokens };
+    const validation = await Auth.validate(tokens.access_token);
+    if (validation && validation.user_id) {
+        currentTokens[type] = { ...tokens, user_id: validation.user_id };
+    } else {
+        currentTokens[type] = { ...tokens };
     }
-
-    else currentTokens[type] = { ...tokens };
 
     await saveTokens(currentTokens);
 
     events.emit('auth:update');
 
     return Response.redirect('/');
-};
-
-export const getAppToken = async (): Promise<TwitchAuth | null> => {
-    const tokens = await readTokensSafe();
-
-    if (tokens.app?.access_token) {
-        const validate = await fetch('https://id.twitch.tv/oauth2/validate', {
-            headers: { 'Authorization': `Bearer ${tokens.app.access_token}` }
-        });
-        if (validate.ok) return tokens.app;
-    }
-
-    console.log('🔄 Generating new App Token...');
-    const response = await fetch('https://id.twitch.tv/oauth2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            client_id: Bun.env.TWITCH_CLIENT_ID!,
-            client_secret: Bun.env.TWITCH_CLIENT_SECRET!,
-            grant_type: 'client_credentials'
-        })
-    });
-
-    if (!response.ok) {
-        console.error('Failed to generate App Token:', await response.text());
-        return null;
-    }
-
-    const newTokens = await response.json() as TwitchAuth;
-    const freshTokens = await readTokensSafe();
-    freshTokens.app = newTokens;
-    await saveTokens(freshTokens);
-    return newTokens;
-};
-
-// -- Conduit Helpers --
-
-export const getConduit = async (): Promise<string | null> => {
-    const tokens = await readTokensSafe();
-    if (tokens.conduit_id) return tokens.conduit_id;
-
-    const appToken = await getAppToken();
-    if (!appToken) return null;
-
-    console.log('🌐 Creating Twitch Conduit...');
-    const response = await fetch('https://api.twitch.tv/helix/eventsub/conduits', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${appToken.access_token}`,
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ shard_count: 1 })
-    });
-
-    if (!response.ok) {
-        console.error('Failed to create conduit:', await response.text());
-        return null;
-    }
-
-    const data = await response.json() as { data: { id: string }[] };
-    const conduitId = data.data[0]!.id;
-
-    const freshTokens = await readTokensSafe();
-    freshTokens.conduit_id = conduitId;
-    await saveTokens(freshTokens);
-
-    return conduitId;
-};
-
-export const updateConduitShard = async (req: BunRequest<'/api/conduit/update'>) => {
-    const { session_id } = await req.json() as { session_id: string };
-    if (!session_id) return new Response('Missing session_id', { status: 400 });
-
-    const conduitId = await getConduit();
-    if (!conduitId) return new Response('Failed to get/create conduit', { status: 500 });
-
-    const appToken = await getAppToken();
-    if (!appToken) return new Response('No App Token', { status: 500 });
-
-    console.log(`🔗 Assigning Shard 0 to Session: ${session_id}`);
-    let response = await fetch('https://api.twitch.tv/helix/eventsub/conduits/shards', {
-        method: 'PATCH',
-        headers: {
-            'Authorization': `Bearer ${appToken.access_token}`,
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            conduit_id: conduitId,
-            shards: [{
-                id: "0",
-                transport: {
-                    method: 'websocket',
-                    session_id: session_id
-                }
-            }]
-        })
-    });
-
-    // If Conduit Not Found (404), recreate it and retry
-    if (response.status === 404) {
-        console.warn('⚠️ Conduit ID not found on Twitch. Recreating...');
-        const tokens = await readTokensSafe();
-        tokens.conduit_id = undefined;
-        await saveTokens(tokens);
-
-        const newConduitId = await getConduit();
-        if (!newConduitId) return new Response('Failed to recreate conduit', { status: 500 });
-
-        console.log(`🔗 Assigning Shard 0 to Session: ${session_id} (New Conduit: ${newConduitId})`);
-        response = await fetch('https://api.twitch.tv/helix/eventsub/conduits/shards', {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${appToken.access_token}`,
-                'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                conduit_id: newConduitId,
-                shards: [{
-                    id: "0",
-                    transport: {
-                        method: 'websocket',
-                        session_id: session_id
-                    }
-                }]
-            })
-        });
-    }
-
-    if (!response.ok) {
-        const err = await response.text();
-        console.error('Failed to update conduit shard:', err);
-        return new Response(err, { status: response.status });
-    }
-
-    return new Response('Conduit Shard Updated');
-};
-
-
-export const handleValidate = async (req: BunRequest<'/auth/validate'>) => {
-    const tokens = await readTokensSafe();
-    let changed = false;
-
-    const refreshUserToken = async (type: 'broadcaster' | 'bot') => {
-        const t = tokens[type];
-        if (!t) return;
-
-        const validate = await fetch('https://id.twitch.tv/oauth2/validate', {
-            headers: { 'Authorization': `Bearer ${t.access_token}` }
-        });
-
-        if (!validate.ok) {
-            console.log(`🔄 Refreshing ${type} Token...`);
-            const refresh = await fetch('https://id.twitch.tv/oauth2/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: Bun.env.TWITCH_CLIENT_ID!,
-                    client_secret: Bun.env.TWITCH_CLIENT_SECRET!,
-                    refresh_token: t.refresh_token,
-                    grant_type: 'refresh_token'
-                })
-            });
-
-            if (refresh.ok) {
-                const refreshed = await refresh.json() as TwitchAuth;
-                const fresh = await readTokensSafe();
-                if (fresh[type]) {
-                    fresh[type] = { ...fresh[type]!, ...refreshed };
-                    tokens[type] = fresh[type];
-                    changed = true;
-                }
-            }
-
-            else console.error(`Failed to refresh ${type} token`);
-        }
-    };
-
-    await refreshUserToken('broadcaster');
-    await refreshUserToken('bot');
-
-    if (!tokens.app)
-        await getAppToken();
-
-    else {
-        const validate = await fetch('https://id.twitch.tv/oauth2/validate', {
-            headers: { 'Authorization': `Bearer ${tokens.app.access_token}` }
-        });
-
-        if (!validate.ok)
-            await getAppToken();
-    }
-
-    if (changed) await saveTokens(tokens);
-
-    return Response.json(await readTokensSafe());
-};
-
-// -- Other Routes --
-
-export const handleDefine = async (req: BunRequest<'/define/:word'>) => {
-    const { word } = req.params;
-    if (!word) return new Response('Word required', { status: 400 });
-    return Response.redirect(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-};
-
-export const handleWhoami = async () => {
-    const tokens = await readTokensSafe();
-    return Response.json({
-        broadcaster: tokens.broadcaster ? { id: tokens.broadcaster.user_id, login: 'fetched_via_api_if_cached' } : null,
-        bot: tokens.bot ? { id: tokens.bot.user_id } : null,
-        app: tokens.app ? { generated: true } : null
-    });
-};
-
-export const handleTwitchUsers = async (req: BunRequest<'/twitch/users'>) => {
-    const tokens = await readTokensSafe();
-    if (!tokens.broadcaster?.access_token) return new Response('Unauthorized', { status: 401 });
-    const url = new URL(req.url);
-    return fetch(`https://api.twitch.tv/helix/users?${url.searchParams}`, {
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.broadcaster.access_token}`
-        }
-    });
-};
-
-export const handleShoutout = async (req: BunRequest<"/twitch/shoutout">) => {
-    const url = new URL(req.url);
-    const toId = url.searchParams.get("to_id");
-    const tokens = await readTokensSafe();
-
-    if (!toId || !tokens.broadcaster?.user_id || !tokens.bot?.access_token || !tokens.bot?.user_id) {
-        return new Response('Invalid request or unauthorized', { status: 400 });
-    }
-    return fetch(
-        `https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${tokens.broadcaster.user_id}&to_broadcaster_id=${toId}&moderator_id=${tokens.bot.user_id}`, {
-        method: "POST",
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.bot.access_token}`,
-            'Content-Type': 'application/json'
-        },
-    });
-};
-
-export const handleTwitchChannelsGet = async (req: BunRequest<'/twitch/channels'>) => {
-    const tokens = await readTokensSafe();
-    if (!tokens.broadcaster?.access_token) return new Response('Unauthorized', { status: 401 });
-
-    const url = new URL(req.url);
-    return fetch(`https://api.twitch.tv/helix/channels?${url.searchParams}`, {
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.broadcaster.access_token}`
-        }
-    });
-};
-
-export const handleTwitchChannelsPatch = async (req: BunRequest<'/twitch/channels'>) => {
-    const tokens = await readTokensSafe();
-    if (!tokens.broadcaster?.access_token || !tokens.broadcaster?.user_id) {
-        return new Response('Unauthorized', { status: 401 });
-    }
-
-    const body = await req.json();
-
-    return fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${tokens.broadcaster.user_id}`, {
-        method: 'PATCH',
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.broadcaster.access_token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
-};
-
-export const handleTwitchGames = async (req: BunRequest<'/twitch/games'>) => {
-    const appToken = await getAppToken();
-    if (!appToken) return new Response('Server Error', { status: 500 });
-
-    const url = new URL(req.url);
-    return fetch(`https://api.twitch.tv/helix/games?${url.searchParams}`, {
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${appToken.access_token}`
-        }
-    });
-};
-
-export const handleTwitchAnnouncements = async (req: BunRequest<'/twitch/announcements'>) => {
-    const tokens = await readTokensSafe();
-
-    if (!tokens.broadcaster?.user_id || !tokens.bot?.access_token || !tokens.bot?.user_id)
-        return new Response('Unauthorized - Missing Broadcaster ID or Bot Token', { status: 401 });
-
-    const body = await req.json();
-
-    return fetch(`https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${tokens.broadcaster.user_id}&moderator_id=${tokens.bot.user_id}`, {
-        method: 'POST',
-        headers: {
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Authorization': `Bearer ${tokens.bot.access_token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    });
-};
-
-export const handleUptime = async (req: BunRequest<'/uptime/:channel'>) => {
-    const { channel } = req.params;
-    return Response.redirect(`https://decapi.me/twitch/uptime?channel=${channel.replace(/\#/g, '')}`);
-};
-
-export const handleClips = async (req: BunRequest<'/clips/:channel'>) => {
-    const { channel } = req.params;
-    return Response.redirect(`https://streamgood.gg/shoutout/api?channel=${channel}&mode=random&last_game=true&max_length=60&filter_long_videos=true`)
-};
-
-export const handleChatSend = async (req: BunRequest<'/api/chat/send'>) => {
-    const tokens = await readTokensSafe();
-
-    if (!tokens.app?.access_token)
-        return new Response('No App Token', { status: 500 });
-
-    if (!tokens.bot?.user_id)
-        return new Response('No Bot User ID', { status: 500 });
-
-    const body = await req.json() as {
-        broadcaster_id: string;
-        message: string;
-    };
-
-    return fetch('https://api.twitch.tv/helix/chat/messages', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${tokens.app.access_token}`,
-            'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            broadcaster_id: body.broadcaster_id,
-            sender_id: tokens.bot.user_id,
-            message: body.message
-        })
-    });
-};
-
-export const handleEventSubSubscribe = async (req: BunRequest<'/api/eventsub/subscribe'>) => {
-    try {
-        const body = await req.json() as any;
-        const appToken = await getAppToken();
-        if (!appToken)
-            return Response.json({ error: 'No App Token' }, { status: 500 });
-
-        const conduitId = await getConduit();
-
-        if (!conduitId)
-            return Response.json({ error: 'No Conduit ID' }, { status: 500 });
-
-        body.transport = {
-            method: 'conduit',
-            conduit_id: conduitId
-        };
-
-        const response = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${appToken.access_token}`,
-                'Client-Id': Bun.env.TWITCH_CLIENT_ID!,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-
-        const data = await response.json();
-        return Response.json(data, { status: response.status });
-    }
-
-    catch (e: any) {
-        console.error('EventSub Subscribe Error:', e);
-        return Response.json({ error: e.message }, { status: 500 });
-    }
 };

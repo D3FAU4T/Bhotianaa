@@ -1,45 +1,39 @@
-import type Bhotianaa from '../Core/Client';
 import { formatDate } from '../Core/Functions';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import type { Command, DynamicCommand } from '../Typings/Bhotianaa';
 
-export default <ICommand>{
+export default <Command>{
     name: 'cominfo',
     description: 'Show information about a dynamic command',
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        const { userstate, args } = context;
+    aliases: ['commandinfo', 'command'],
+    roles: ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'],
+    execute: async (notification, client, sharedContext) => {
+        const args = notification.event.message.text.split(' ');
+        const commandAlias = args.shift();
 
-        if (args.length < 1) {
-            await client.twitch.say(`@${userstate.user_name} Usage: !cominfo <!commandName>`);
-            return;
-        }
-
-        let commandName = args[0];
+        const commandName = args[0]?.replace('!', '').toLowerCase();
 
         if (!commandName) {
-            await client.twitch.say(`@${userstate.user_name} Invalid command name.`);
+            await client.reply(notification.event.message_id, `Usage: ${commandAlias} <!commandName>`);
             return;
         }
 
-
-        if (commandName.startsWith('!'))
-            commandName = commandName.slice(1);
-
+        let command: Command | DynamicCommand | undefined = sharedContext.commands.system.get(commandName);
+        
         // Check if it's a hard-coded command
-        if (client.commands.has(commandName)) {
-            const command = client.commands.get(commandName)!;
-            await client.twitch.say(`@${userstate.user_name} !${commandName} is a hard-coded command. Description: ${command.description}`);
+        if (command) {
+            await client.reply(notification.event.message_id, `!${command.name} is a hard-coded command. Description: ${command.description}`);
             return;
         }
+
+        command = sharedContext.commands.dynamic.get(commandName);
 
         // Check if dynamic command exists
-        if (!client.dynamicCommands.has(commandName)) {
-            await client.twitch.say(`@${userstate.user_name} Command !${commandName} does not exist.`);
-            return;
+        if (command) {
+            const createdDate = formatDate(command.createdAt);
+            await client.reply(notification.event.message_id, `!${command.name} - Created by ${command.createdBy} on ${createdDate}. Response: ${command.response}`);
         }
 
-        const dynamicCommand = client.dynamicCommands.get(commandName)!;
-        const createdDate = formatDate(dynamicCommand.createdAt);
-
-        await client.twitch.say(`@${userstate.user_name} !${commandName} - Created by ${dynamicCommand.createdBy} on ${createdDate}. Response: ${dynamicCommand.response}`);
+        else
+            await client.reply(notification.event.message_id, `Command !${commandName} does not exist.`);
     }
 };

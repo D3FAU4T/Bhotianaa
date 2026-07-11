@@ -27,3 +27,9 @@ export interface DictionaryAPI {
     },
     sourceUrls: string[]; // [ "https://en.wiktionary.org/wiki/hallelujah" ]
 }
+
+export interface DictionaryAPIError {
+    title: string;
+    message: string;
+    resolution: string;
+}

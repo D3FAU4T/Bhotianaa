@@ -1,29 +1,48 @@
-import { server } from '../..';
-import type Bhotianaa from '../Core/Client';
-import type { CommandContext, ICommand } from '../Typings/Bhotianaa';
+import { Helix } from 'twitch';
+import type { Command } from '../Typings/Bhotianaa';
 
-export default <ICommand>{
+export default <Command>{
     name: 'uptime',
     description: 'Gets the uptime of the stream',
-    async execute(context: CommandContext, client: Bhotianaa): Promise<void> {
-        let uptime: string;
+    roles: ['broadcaster', 'moderator', 'lead_moderator', 'vip', 'subscriber', 'viewer'],
+    aliases: null,
+    async execute(notification, client, sharedContext) {
 
-        if (context.args[0]) {
-            const response = await fetch(server.url + `uptime/${context.args[0]}`);
-            uptime = await response.text();
+        let startedAt = sharedContext.streamInfo.startedAt;
+
+        if (!startedAt) {
+            const res = await Helix.Stream.get(
+                { user_id: [ Bun.env.BROADCASTER_USER_ID ] },
+                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+            );
+
+            if (!res.is_success)
+                return await client.reply(
+                    notification.event.message_id,
+                    `Failed to get stream info: ${res.error}`
+                );
+
+            if (!res.data[0])
+                return await client.reply(
+                    notification.event.message_id,
+                    'Shhh, my mamma is sleeping, do not disturb her'
+                );
+            
+            startedAt = res.data[0].started_at;
         }
 
-        else {
-            const response = await fetch(server.url + `uptime/${context.channel.replace('#', '')}`);
-            uptime = await response.text();
-        }
+        const currentTime = Date.now();
+        const diff = currentTime - new Date(startedAt).getTime();
 
-        if (uptime === 'gianaa_ is offline')
-            await client.twitch.say('Shhh, my mamma is sleeping, do not disturb her');
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-        else if (context.args[0]?.toLowerCase() === 'gianaa_')
-            await client.twitch.say(`My mamma has been live for ${uptime} blobDance`);
+        const uptime = `${hours}h ${minutes}m ${seconds}s`;
 
-        else await client.twitch.say(`@${context.userstate.user_login}, ${uptime} VoHiYo`);
+        await client.reply(
+            notification.event.message_id,
+            `My mamma has been live for ${uptime} VoHiYo`
+        );
     }
 };

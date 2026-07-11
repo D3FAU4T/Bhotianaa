@@ -6,41 +6,62 @@ interface DynamicCommandsViewProps {
     ws: WebSocket | null;
 }
 
+const ALL_ROLES = ['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'];
+
 const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCommand, setEditingCommand] = useState<string | null>(null);
     const [newCommandName, setNewCommandName] = useState('');
     const [newCommandResponse, setNewCommandResponse] = useState('');
+    const [newCommandAliases, setNewCommandAliases] = useState('');
+    const [newCommandRoles, setNewCommandRoles] = useState<string[]>(ALL_ROLES);
 
     const handleCreateCommand = () => {
         if (!newCommandName.trim() || !newCommandResponse.trim()) return;
 
         if (ws && ws.readyState === WebSocket.OPEN) {
+            const aliasArray = newCommandAliases
+                .split(',')
+                .map((a) => a.trim().toLowerCase().replace(/^!/, ''))
+                .filter(Boolean);
+
             ws.send(JSON.stringify({
                 action: 'create',
                 name: newCommandName.toLowerCase().replace(/^!/, ''),
                 response: newCommandResponse,
-                createdBy: 'dashboard'
+                aliases: aliasArray.length > 0 ? aliasArray : null,
+                roles: newCommandRoles,
+                createdBy: 'dashboard',
             }));
-            setNewCommandName('');
-            setNewCommandResponse('');
+            handleCancelEdit();
         }
     };
 
     const handleCancelEdit = () => {
+        setIsModalOpen(false);
         setEditingCommand(null);
         setNewCommandName('');
         setNewCommandResponse('');
+        setNewCommandAliases('');
+        setNewCommandRoles(ALL_ROLES);
     };
 
     const handleUpdateCommand = () => {
         if (!newCommandName.trim() || !newCommandResponse.trim()) return;
 
         if (ws && ws.readyState === WebSocket.OPEN) {
+            const aliasArray = newCommandAliases
+                .split(',')
+                .map((a) => a.trim().toLowerCase().replace(/^!/, ''))
+                .filter(Boolean);
+
             ws.send(JSON.stringify({
                 action: 'update',
                 name: newCommandName.toLowerCase().replace(/^!/, ''),
                 response: newCommandResponse,
+                aliases: aliasArray.length > 0 ? aliasArray : null,
+                roles: newCommandRoles,
             }));
             handleCancelEdit();
         }
@@ -50,15 +71,80 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 action: 'delete',
-                name
+                name,
             }));
         }
     };
 
-    const handleEditCommand = (name: string, response: string) => {
+    const handleEditCommand = (name: string, command: any) => {
         setEditingCommand(name);
         setNewCommandName(name);
-        setNewCommandResponse(response);
+        setNewCommandResponse(command.response);
+        setNewCommandAliases(command.aliases ? command.aliases.join(', ') : '');
+        setNewCommandRoles(command.roles || ALL_ROLES);
+        setIsModalOpen(true);
+    };
+
+    const getRoleBadges = (roles: string[]) => {
+        if (!roles || roles.length === 0) return <span style={{ color: '#ff4757', fontSize: '0.75rem' }}>None</span>;
+
+        const hasAll = ALL_ROLES.every((r) => roles.includes(r));
+        if (hasAll) {
+            return (
+                <span style={{
+                    backgroundColor: 'rgba(46, 213, 115, 0.1)',
+                    color: '#2ed573',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '0.3rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                }}>
+                    Everyone
+                </span>
+            );
+        }
+
+        const hasMods = ['broadcaster', 'lead_moderator', 'moderator'].every((r) => roles.includes(r)) && roles.length === 3;
+        if (hasMods) {
+            return (
+                <span style={{
+                    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                    color: '#ff4757',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '0.3rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                }}>
+                    Mods & Broadcaster
+                </span>
+            );
+        }
+
+        const labelMap: Record<string, string> = {
+            broadcaster: 'Broadcaster',
+            lead_moderator: 'Lead Mod',
+            moderator: 'Mod',
+            subscriber: 'Sub',
+            vip: 'VIP',
+            viewer: 'Viewer',
+        };
+
+        return (
+            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                {ALL_ROLES.filter((r) => roles.includes(r)).map((r) => (
+                    <span key={r} style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        color: '#ccc',
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: '0.3rem',
+                        fontSize: '0.75rem',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}>
+                        {labelMap[r] || r}
+                    </span>
+                ))}
+            </div>
+        );
     };
 
     const filteredCommands = Object.entries(dynamicCommands)
@@ -70,7 +156,8 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
 
     return (
         <div style={{ padding: '1.5rem', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '1rem' }}>
+            {/* Top Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
                 <div style={{ position: 'relative', width: '300px' }}>
                     <input
                         type="text"
@@ -87,7 +174,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                             color: 'white',
                             fontSize: '0.9rem',
                             outline: 'none',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
                         }}
                         onFocus={(e) => e.target.style.borderColor = '#7d2ee0'}
                         onBlur={(e) => e.target.style.borderColor = '#3a3f47'}
@@ -108,99 +195,240 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                 </div>
-            </div>
-
-            {/* Create/Edit Command Bar */}
-            <div style={{
-                backgroundColor: '#0f131a',
-                padding: '1rem',
-                borderRadius: '1rem',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                gap: '1rem',
-                alignItems: 'center',
-                border: editingCommand ? '1px solid #7d2ee0' : '1px solid #1f242e',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                transition: 'border-color 0.3s'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', color: editingCommand ? '#7d2ee0' : '#9146ff', fontWeight: 'bold' }}>
-                    <span style={{ fontSize: '1.2rem', paddingRight: '0.5rem' }}>
-                        {editingCommand ? '✎' : '+'}
-                    </span>
-                </div>
-                <input
-                    type="text"
-                    placeholder="Command name"
-                    value={newCommandName}
-                    onChange={(e) => setNewCommandName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (editingCommand ? handleUpdateCommand() : handleCreateCommand())}
-                    disabled={!!editingCommand}
-                    style={{
-                        flex: '0 0 200px',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #2d3340',
-                        backgroundColor: editingCommand ? '#14171f' : '#1a1f26',
-                        color: editingCommand ? '#888' : 'white',
-                        fontSize: '0.9rem',
-                        outline: 'none',
-                        cursor: editingCommand ? 'not-allowed' : 'text'
-                    }}
-                />
-                <input
-                    type="text"
-                    placeholder="Response message..."
-                    value={newCommandResponse}
-                    onChange={(e) => setNewCommandResponse(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (editingCommand ? handleUpdateCommand() : handleCreateCommand())}
-                    style={{
-                        flex: 1,
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #2d3340',
-                        backgroundColor: '#1a1f26',
-                        color: 'white',
-                        fontSize: '0.9rem',
-                        outline: 'none'
-                    }}
-                />
-                {editingCommand && (
-                    <button
-                        onClick={handleCancelEdit}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            backgroundColor: 'transparent',
-                            color: '#ccc',
-                            border: '1px solid #3a3f47',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            fontWeight: '600',
-                            whiteSpace: 'nowrap'
-                        }}
-                    >
-                        Cancel
-                    </button>
-                )}
                 <button
-                    onClick={editingCommand ? handleUpdateCommand : handleCreateCommand}
-                    disabled={!newCommandName.trim() || !newCommandResponse.trim()}
+                    onClick={() => {
+                        handleCancelEdit();
+                        setIsModalOpen(true);
+                    }}
                     style={{
                         padding: '0.75rem 1.5rem',
-                        backgroundColor: (!newCommandName.trim() || !newCommandResponse.trim()) ? '#2d3340' : (editingCommand ? '#7d2ee0' : '#9146ff'),
+                        backgroundColor: '#9146ff',
                         color: 'white',
                         border: 'none',
                         borderRadius: '0.5rem',
-                        cursor: (!newCommandName.trim() || !newCommandResponse.trim()) ? 'not-allowed' : 'pointer',
+                        cursor: 'pointer',
                         fontSize: '0.9rem',
                         fontWeight: '600',
-                        whiteSpace: 'nowrap',
-                        transition: 'background-color 0.2s'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 4px 14px rgba(145, 70, 255, 0.4)',
+                        transition: 'transform 0.2s, background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#7d2ee0';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#9146ff';
+                        e.currentTarget.style.transform = 'translateY(0)';
                     }}
                 >
-                    {editingCommand ? 'Save Changes' : 'Add Command'}
+                    <span style={{ fontSize: '1.2rem', lineHeight: '1' }}>+</span>
+                    Add Command
                 </button>
             </div>
+
+            {/* Input Overlay Modal */}
+            {isModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)',
+                }}>
+                    <div style={{
+                        backgroundColor: '#0f131a',
+                        border: '1px solid #1f242e',
+                        borderRadius: '1rem',
+                        width: '550px',
+                        maxWidth: '90%',
+                        padding: '2rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.25rem',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1f242e', paddingBottom: '1rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#9146ff' }}>
+                                {editingCommand ? `Edit Command: !${editingCommand}` : 'Create New Command'}
+                            </h3>
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                style={{ background: 'none', border: 'none', color: '#888', fontSize: '1.25rem', cursor: 'pointer' }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'bold' }}>Command Name</label>
+                            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                                <span style={{ position: 'absolute', left: '0.75rem', color: '#888', fontSize: '0.95rem' }}>!</span>
+                                <input
+                                    type="text"
+                                    placeholder="hello"
+                                    value={newCommandName}
+                                    onChange={(e) => setNewCommandName(e.target.value)}
+                                    disabled={!!editingCommand}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        paddingLeft: '1.5rem',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid #2d3340',
+                                        backgroundColor: editingCommand ? '#14171f' : '#1a1f26',
+                                        color: editingCommand ? '#888' : 'white',
+                                        fontSize: '0.95rem',
+                                        outline: 'none',
+                                        cursor: editingCommand ? 'not-allowed' : 'text',
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'bold' }}>Aliases (comma separated)</label>
+                            <input
+                                type="text"
+                                placeholder="hi, hey, welcome"
+                                value={newCommandAliases}
+                                onChange={(e) => setNewCommandAliases(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #2d3340',
+                                    backgroundColor: '#1a1f26',
+                                    color: 'white',
+                                    fontSize: '0.95rem',
+                                    outline: 'none',
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'bold' }}>Response message</label>
+                            <textarea
+                                placeholder="Hello! Welcome to the channel!"
+                                value={newCommandResponse}
+                                onChange={(e) => setNewCommandResponse(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    height: '100px',
+                                    padding: '0.75rem',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #2d3340',
+                                    backgroundColor: '#1a1f26',
+                                    color: 'white',
+                                    fontSize: '0.95rem',
+                                    outline: 'none',
+                                    resize: 'none',
+                                    fontFamily: 'inherit',
+                                }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'bold', marginBottom: '0.2rem' }}>Permitted Userlevels (Roles)</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                                {['broadcaster', 'lead_moderator', 'moderator', 'subscriber', 'vip', 'viewer'].map((role) => {
+                                    const isChecked = newCommandRoles.includes(role);
+                                    const roleLabels: Record<string, string> = {
+                                        broadcaster: 'Broadcaster',
+                                        lead_moderator: 'Lead Mod',
+                                        moderator: 'Moderator',
+                                        subscriber: 'Subscriber',
+                                        vip: 'VIP',
+                                        viewer: 'Viewer',
+                                    };
+                                    return (
+                                        <label
+                                            key={role}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                cursor: 'pointer',
+                                                backgroundColor: isChecked ? 'rgba(145, 70, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                                                padding: '0.6rem 0.8rem',
+                                                borderRadius: '0.5rem',
+                                                border: isChecked ? '1px solid #9146ff' : '1px solid #2d3340',
+                                                fontSize: '0.85rem',
+                                                color: isChecked ? 'white' : '#aaa',
+                                                transition: 'all 0.2s',
+                                                userSelect: 'none',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setNewCommandRoles([...newCommandRoles, role]);
+                                                    } else {
+                                                        setNewCommandRoles(newCommandRoles.filter((r) => r !== role));
+                                                    }
+                                                }}
+                                                style={{ accentColor: '#9146ff', cursor: 'pointer' }}
+                                            />
+                                            {roleLabels[role]}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', borderTop: '1px solid #1f242e', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
+                            <button
+                                onClick={handleCancelEdit}
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: 'transparent',
+                                    color: '#ccc',
+                                    border: '1px solid #3a3f47',
+                                    borderRadius: '0.5rem',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (editingCommand) {
+                                        handleUpdateCommand();
+                                    } else {
+                                        handleCreateCommand();
+                                    }
+                                }}
+                                disabled={!newCommandName.trim() || !newCommandResponse.trim()}
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: (!newCommandName.trim() || !newCommandResponse.trim()) ? '#2d3340' : '#9146ff',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.5rem',
+                                    cursor: (!newCommandName.trim() || !newCommandResponse.trim()) ? 'not-allowed' : 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600',
+                                    boxShadow: (!newCommandName.trim() || !newCommandResponse.trim()) ? 'none' : '0 4px 12px rgba(145,70,255,0.3)',
+                                }}
+                            >
+                                {editingCommand ? 'Save Changes' : 'Create Command'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Commands Grid */}
             <div className="custom-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
@@ -212,7 +440,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                         justifyContent: 'center',
                         alignItems: 'center',
                         color: '#888',
-                        gap: '1rem'
+                        gap: '1rem',
                     }}>
                         <div style={{ fontSize: '3rem', opacity: 0.3 }}>🔍</div>
                         <p>{Object.keys(dynamicCommands).length === 0 ? "No commands created yet." : "No commands match your search."}</p>
@@ -222,7 +450,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                         gap: '1rem',
-                        paddingBottom: '2rem'
+                        paddingBottom: '2rem',
                     }}>
                         {filteredCommands.map(([name, command]) => (
                             <div
@@ -238,7 +466,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                     border: '1px solid transparent',
                                     transition: 'all 0.2s',
                                     position: 'relative',
-                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.transform = 'translateY(-4px)';
@@ -258,13 +486,13 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                         color: '#9146ff',
                                         backgroundColor: 'rgba(145, 70, 255, 0.1)',
                                         padding: '0.2rem 0.6rem',
-                                        borderRadius: '0.4rem'
+                                        borderRadius: '0.4rem',
                                     }}>
                                         !{name}
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button
-                                            onClick={() => handleEditCommand(name, command.response)}
+                                            onClick={() => handleEditCommand(name, command)}
                                             title="Edit Command"
                                             style={{
                                                 backgroundColor: 'transparent',
@@ -276,7 +504,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 borderRadius: '0.4rem',
-                                                transition: 'all 0.2s'
+                                                transition: 'all 0.2s',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.backgroundColor = 'rgba(125, 46, 224, 0.1)';
@@ -305,7 +533,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 borderRadius: '0.4rem',
-                                                transition: 'all 0.2s'
+                                                transition: 'all 0.2s',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.1)';
@@ -325,17 +553,28 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                 </div>
 
                                 <div style={{
-                                    flex: 1,
                                     color: '#e0e0e0',
                                     lineHeight: '1.5',
                                     fontSize: '0.95rem',
                                     wordBreak: 'break-word',
-                                    display: '-webkit-box',
-                                    WebkitLineClamp: 3,
-                                    WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden'
                                 }}>
                                     {command.response}
+                                </div>
+
+                                {command.aliases && command.aliases.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', fontSize: '0.8rem', color: '#888', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: '600' }}>Aliases:</span>
+                                        {command.aliases.map((alias: string) => (
+                                            <span key={alias} style={{ backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.1rem 0.4rem', borderRadius: '0.3rem' }}>
+                                                !{alias}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', fontSize: '0.8rem', color: '#888', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: '600' }}>Userlevels:</span>
+                                    {getRoleBadges(command.roles)}
                                 </div>
 
                                 <div style={{
@@ -345,7 +584,7 @@ const DynamicCommandsView = ({ dynamicCommands, ws }: DynamicCommandsViewProps) 
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     fontSize: '0.75rem',
-                                    color: '#888'
+                                    color: '#888',
                                 }}>
                                     <span>{command.createdBy}</span>
                                     <span>{formatDate(command.createdAt)}</span>
