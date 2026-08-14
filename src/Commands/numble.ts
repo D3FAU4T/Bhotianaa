@@ -7,44 +7,56 @@ export default <Command> {
     aliases: null,
     roles: ["broadcaster", "lead_moderator", "moderator", "vip", "subscriber", "viewer"],
     execute: async (notification, client, _sharedContext) => {
-        const [goalStr, numsStr] = notification.event.message.text.split(';');
+        // Strip command prefix (e.g. "!numble")
+        const rawContent = notification.event.message.text.replace(/^!\S+\s*/, '').trim();
 
-        if (!goalStr || !numsStr)
+        if (!rawContent) {
             return await client.reply(
                 notification.event.message_id,
-                "Usage: !numble <target>; <num1> <num2> <num3>..."
+                "Usage: !numble <target>; <num1> <num2> <num3>... (or !numble <target> <num1> <num2> <num3>...)"
             );
+        }
 
-        // Parse target number
-        const target = parseFloat(goalStr.trim());
+        let target: number;
+        let numberStrings: string[] = [];
 
-        if (isNaN(target))
+        if (rawContent.includes(';')) {
+            const [goalStr, numsStr] = rawContent.split(';');
+            target = parseFloat(goalStr?.trim() ?? '');
+            if (numsStr) {
+                numberStrings = numsStr.trim().split(/[\s,]+/).filter(Boolean);
+            }
+        } else {
+            const tokens = rawContent.split(/[\s,]+/).filter(Boolean);
+            target = parseFloat(tokens[0] ?? '');
+            numberStrings = tokens.slice(1);
+        }
+
+        if (isNaN(target)) {
             return await client.reply(
                 notification.event.message_id,
-                "❌ Invalid target number. Please provide a valid number."
+                "❌ Invalid target number. Please provide a valid number. Usage: !numble <target>; <num1> <num2>..."
             );
+        }
 
-        // Parse numbers array
-        const numberStrings = numsStr.trim().split(/\s+/);
         const numbers: number[] = [];
-
         for (const numStr of numberStrings) {
             const num = parseFloat(numStr);
-
-            if (isNaN(num))
+            if (isNaN(num)) {
                 return await client.reply(
                     notification.event.message_id,
-                    `❌ Invalid number: \"${numStr}\". Please provide valid numbers.`
+                    `❌ Invalid number: "${numStr}". Please provide valid numbers.`
                 );
-            
+            }
             numbers.push(num);
         }
 
-        if (numbers.length < 2)
+        if (numbers.length < 2) {
             return await client.reply(
                 notification.event.message_id,
                 "❌ Please provide at least 2 numbers to work with."
             );
+        }
 
         try {
             await client.say("Computing...");

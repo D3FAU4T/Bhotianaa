@@ -10,6 +10,11 @@ const change_title = tool({
         title: z.string().describe("The new stream title.")
     },
     implementation: async ({ title }) => {
+        if (!config.env.broadcaster?.access_token) {
+            await client.say(`Broadcaster is not logged in.`);
+            return;
+        }
+
         const result = await Helix.Channel.patch(
             Bun.env.BROADCASTER_USER_ID,
             { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: config.env.broadcaster.access_token },
@@ -31,6 +36,11 @@ const change_game = tool({
     },
 
     implementation: async ({ gameName }) => {
+        if (!config.env.broadcaster?.access_token) {
+            await client.say(`Broadcaster is not logged in.`);
+            return;
+        }
+
         const game = await Helix.Games.get(
             { name: gameName },
             { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: config.env.app }

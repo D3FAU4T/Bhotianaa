@@ -17,9 +17,10 @@ export default <Command>{
             // Allow checking other users' points
             if (args[0]) {
                 targetUsername = args[0].toLowerCase().replace('@', '');
+                const accessToken = sharedContext.env.broadcaster?.access_token || sharedContext.env.app;
                 const userId = await Helix.Users.get(
                     { names: [targetUsername] },
-                    { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
+                    { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken },
                 );
 
                 if (!userId.is_success || !userId.data[0])

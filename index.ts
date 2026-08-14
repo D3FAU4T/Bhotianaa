@@ -192,6 +192,12 @@ client.on("channel.chat.message", async (notification) => {
         }
     }
 
+    if (message.endsWith(',')) {
+        const trimmedMessage = message.slice(0, -1);
+        await client.say(trimmedMessage);
+        return;
+    }
+
     if (!message.startsWith("!")) return;
 
     const badges = notification.event.badges.map((badge) => badge.set_id);
@@ -230,9 +236,10 @@ client.on("channel.chat.message", async (notification) => {
 client.on("stream.online", async (notification) => {
     config.streamInfo.startedAt = notification.event.started_at;
 
+    const accessToken = config.env.broadcaster?.access_token || config.env.app;
     const result = await Helix.Channel.get(Bun.env.BROADCASTER_USER_ID, {
         clientId: Bun.env.TWITCH_CLIENT_ID,
-        accessToken: config.env.broadcaster.access_token,
+        accessToken,
     });
 
     if (!result.is_success || !result.data[0]) return;

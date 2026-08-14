@@ -25,9 +25,10 @@ export default <Command>{
                 `Please provide a valid positive number for points.`
             );
 
+        const accessToken = sharedContext.env.broadcaster?.access_token || sharedContext.env.app;
         const targetUserId = await Helix.Users.get(
             { names: [targetUsername] },
-            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+            { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken }
         );
 
         if (!targetUserId.is_success || !targetUserId.data[0]) {

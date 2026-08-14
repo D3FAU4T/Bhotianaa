@@ -76,41 +76,50 @@ export const revalidateTokens = async () => {
     const envFile = Bun.file("./src/Config/tokens.json");
     const env: TokenEnv = await envFile.json();
 
-    let isValid = await Auth.validate(env.broadcaster.access_token);
+    if (env.broadcaster && typeof env.broadcaster === 'object' && env.broadcaster.access_token) {
+        const isValid = await Auth.validate(env.broadcaster.access_token);
 
-    if (!isValid) {
-        console.warn("Broadcaster access token is invalid or expired. Fetching a new one...");
-        const newToken = await Auth.refreshTokenFlow({
-            clientId: Bun.env.TWITCH_CLIENT_ID,
-            clientSecret: Bun.env.TWITCH_CLIENT_SECRET,
-            refreshToken: env.broadcaster.refresh_token,
-        });
+        if (!isValid) {
+            if (env.broadcaster.refresh_token) {
+                console.warn("Broadcaster access token is invalid or expired. Fetching a new one...");
+                const newToken = await Auth.refreshTokenFlow({
+                    clientId: Bun.env.TWITCH_CLIENT_ID!,
+                    clientSecret: Bun.env.TWITCH_CLIENT_SECRET!,
+                    refreshToken: env.broadcaster.refresh_token,
+                });
 
-        if ('error' in newToken) {
-            throw new Error(`Failed to refresh broadcaster access token: ${newToken.error} - ${newToken.message}`);
+                if (newToken && 'access_token' in newToken && typeof newToken.access_token === 'string') {
+                    env.broadcaster = newToken;
+                    await envFile.write(JSON.stringify(env, null, 4));
+                } else {
+                    console.warn("Failed to refresh broadcaster access token. Broadcaster needs to re-authenticate.");
+                    env.broadcaster = null;
+                    await envFile.write(JSON.stringify(env, null, 4));
+                }
+            } else {
+                env.broadcaster = null;
+                await envFile.write(JSON.stringify(env, null, 4));
+            }
         }
-
-        env.broadcaster = newToken;
-
-        await envFile.write(JSON.stringify(env));
+    } else {
+        env.broadcaster = null;
     }
 
-    isValid = await Auth.validate(env.app);
+    const isAppValid = env.app ? await Auth.validate(env.app) : null;
 
-    if (!isValid) {
+    if (!isAppValid) {
         console.warn("App access token is invalid or expired. Fetching a new one...");
         const newToken = await Auth.clientCredentialGrantFlow({
-            clientId: Bun.env.TWITCH_CLIENT_ID,
-            clientSecret: Bun.env.TWITCH_CLIENT_SECRET,
+            clientId: Bun.env.TWITCH_CLIENT_ID!,
+            clientSecret: Bun.env.TWITCH_CLIENT_SECRET!,
         });
 
-        if ('error' in newToken) {
-            throw new Error(`Failed to refresh app access token: ${newToken.error} - ${newToken.message}`);
+        if (newToken && 'access_token' in newToken && typeof newToken.access_token === 'string') {
+            env.app = newToken.access_token;
+            await envFile.write(JSON.stringify(env, null, 4));
+        } else {
+            console.error("Failed to refresh app access token:", newToken);
         }
-
-        env.app = newToken.access_token;
-
-        await envFile.write(JSON.stringify(env));
     }
 
     return env;

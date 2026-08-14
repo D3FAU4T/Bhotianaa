@@ -8,9 +8,10 @@ export default <Command> {
     roles: ['broadcaster', 'lead_moderator', 'moderator'],
     execute: async (notification, client, sharedContext) => {
 
+        const accessToken = sharedContext.env.broadcaster?.access_token || sharedContext.env.app;
         const result = await Helix.Channel.get(Bun.env.BROADCASTER_USER_ID, {
             clientId: Bun.env.TWITCH_CLIENT_ID,
-            accessToken: sharedContext.env.broadcaster.access_token
+            accessToken
         });
 
         if (!result.is_success) {

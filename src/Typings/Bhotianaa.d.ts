@@ -76,6 +76,6 @@ export interface Timer {
 }
 
 export interface TokenEnv {
-    broadcaster: TwitchAuth;
+    broadcaster: TwitchAuth | null;
     app: string;
 }

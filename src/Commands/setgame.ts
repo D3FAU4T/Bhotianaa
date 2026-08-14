@@ -28,9 +28,10 @@ export default <Command>{
         let game = gamesCache.find(game => game.name.toLowerCase() === gameInput.toLowerCase());
 
         if (!game) {
+            const accessToken = sharedContext.env.broadcaster?.access_token || sharedContext.env.app;
             const res = await Helix.Games.get(
                 { name: gameInput },
-                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken }
             );
 
             if (!res.is_success || !res.data[0])
@@ -42,6 +43,13 @@ export default <Command>{
             game = res.data[0];
             gamesCache.push(game);
             await gamesFile.write(JSON.stringify(gamesCache, null, 2));
+        }
+
+        if (!sharedContext.env.broadcaster?.access_token) {
+            return await client.reply(
+                notification.event.message_id,
+                `Broadcaster is not logged in.`
+            );
         }
 
         const response = await Helix.Channel.patch(

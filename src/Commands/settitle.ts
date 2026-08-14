@@ -18,11 +18,18 @@ export default <Command> {
                 `Usage: ${command} <title>`
             );
 
+        if (!sharedContext.env.broadcaster?.access_token) {
+            return await client.reply(
+                notification.event.message_id,
+                `Broadcaster is not logged in.`
+            );
+        }
+
         const response = await Helix.Channel.patch(
             Bun.env.BROADCASTER_USER_ID,
             { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token },
             { title }
-        )
+        );
         
 
         if (!response.is_success)

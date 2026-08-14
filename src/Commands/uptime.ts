@@ -11,9 +11,10 @@ export default <Command>{
         let startedAt = sharedContext.streamInfo.startedAt;
 
         if (!startedAt) {
+            const accessToken = sharedContext.env.broadcaster?.access_token || sharedContext.env.app;
             const res = await Helix.Stream.get(
                 { user_id: [ Bun.env.BROADCASTER_USER_ID ] },
-                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken: sharedContext.env.broadcaster.access_token }
+                { clientId: Bun.env.TWITCH_CLIENT_ID, accessToken }
             );
 
             if (!res.is_success)
