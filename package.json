@@ -19,7 +19,7 @@
         "openai": "^7.5.0",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
-        "twitch": "git+https://github.com/D3FAU4T/Twitch.git",
+        "twitch": "git@github.com:D3FAU4T/Twitch.git",
         "zod": "^4.4.3"
     }
 }
