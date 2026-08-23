@@ -19,6 +19,14 @@ export default <Command> {
         const word = args.join(' ').trim();
 
         const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+
+        if (!response.ok) {
+            return await client.reply(
+                notification.event.message_id,
+                "There was a problem with the dictionary server. Please try again later or ask my Mamma. She's very intelligent! 😊"
+            );
+        }
+        
         const result = await response.json() as DictionaryAPI[] | DictionaryAPIError;
 
         if (!Array.isArray(result))
