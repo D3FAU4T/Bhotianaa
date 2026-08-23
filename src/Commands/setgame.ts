@@ -45,6 +45,15 @@ export default <Command>{
             await gamesFile.write(JSON.stringify(gamesCache, null, 2));
         }
 
+        // Words On Stream
+        if (game.id !== "512821" && sharedContext.wos.enabled)
+            sharedContext.wos = {
+                enabled: false,
+                msgCount: 0,
+                msgQueue: [],
+                word: null,
+            };
+
         if (!sharedContext.env.broadcaster?.access_token) {
             return await client.reply(
                 notification.event.message_id,
@@ -83,5 +92,15 @@ export default <Command>{
                 `EVERYONE! Mamma is playing a new game: ${game.name}`,
                 "blue"
             );
+
+        if (
+            (game.id === "512821" && !sharedContext.link?.startsWith('https://wos.gg'))
+            || (game.id === "1414617745" && !sharedContext.link?.startsWith('https://gos.gg'))
+            || (game.id === "1874168551" && !sharedContext.link?.startsWith('https://streampairs.com'))
+            || (game.id === "807670089" && !sharedContext.link?.startsWith('https://emotesearch.com'))
+            || (game.id === "1970425604" && !sharedContext.link?.startsWith('https://savethedeal.gg'))
+        ) {
+            await client.say("@gianaa_ Mamma, would you like to setup the mirror link?");
+        }
     }
 };

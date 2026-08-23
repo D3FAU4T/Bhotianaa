@@ -79,14 +79,23 @@ export const fetchStreamInfo = async () => {
         }
 
         const channel = channelRes.data[0];
-        const streamRes = await Helix.Stream.get({ user_id: [channelId] }, creds);
-        const isLive = streamRes.is_success && streamRes.data && streamRes.data.length > 0;
+        const streamRes = await Helix.Stream.get(
+            { user_id: [channelId] },
+            creds,
+        );
+        const isLive =
+            streamRes.is_success && streamRes.data && streamRes.data.length > 0;
 
         let gameArt = "";
         if (channel.game_id) {
-            const gameRes = await Helix.Games.get({ id: [channel.game_id] }, creds);
+            const gameRes = await Helix.Games.get(
+                { id: [channel.game_id] },
+                creds,
+            );
             if (gameRes.is_success && gameRes.data && gameRes.data[0]) {
-                gameArt = gameRes.data[0].box_art_url.replace("{width}", "285").replace("{height}", "380");
+                gameArt = gameRes.data[0].box_art_url
+                    .replace("{width}", "285")
+                    .replace("{height}", "380");
             }
         }
 
@@ -170,16 +179,19 @@ client.on("channel.chat.message", async (notification) => {
     console.log(message);
 
     // Broadcast message to WebSocket chat room
-    server.publish("chat", JSON.stringify({
-        message_id: notification.event.message_id,
-        color: notification.event.color,
-        chatter_user_name: notification.event.chatter_user_name,
-        chatter_user_login: notification.event.chatter_user_login,
-        badges: notification.event.badges,
-        message: {
-            text: message
-        }
-    }));
+    server.publish(
+        "chat",
+        JSON.stringify({
+            message_id: notification.event.message_id,
+            color: notification.event.color,
+            chatter_user_name: notification.event.chatter_user_name,
+            chatter_user_login: notification.event.chatter_user_login,
+            badges: notification.event.badges,
+            message: {
+                text: message,
+            },
+        }),
+    );
 
     if (notification.event.chatter_user_id === Bun.env.BOT_USER_ID) return;
 
@@ -192,7 +204,7 @@ client.on("channel.chat.message", async (notification) => {
         }
     }
 
-    if (message.endsWith(',')) {
+    if (message.endsWith(",")) {
         const trimmedMessage = message.slice(0, -1);
         await client.say(trimmedMessage);
         return;
@@ -245,6 +257,15 @@ client.on("stream.online", async (notification) => {
     if (!result.is_success || !result.data[0]) return;
 
     const data = result.data[0];
+
+    // Words On Stream
+    if (data.game_id === "512821")
+        config.wos = {
+            enabled: true,
+            msgCount: 0,
+            msgQueue: [],
+            word: null,
+        };
 
     config.streamInfo.game = {
         id: data.game_id,
@@ -376,7 +397,9 @@ export const server = serve({
         "/whoami": async () => {
             const tokens = await readTokensSafe();
             return Response.json({
-                broadcaster: tokens.broadcaster ? { id: tokens.broadcaster.user_id } : null,
+                broadcaster: tokens.broadcaster
+                    ? { id: tokens.broadcaster.user_id }
+                    : null,
                 bot: null,
             });
         },
@@ -386,35 +409,57 @@ export const server = serve({
     },
 
     websocket: {
-        data: {} as { room: "clips" | "chat" | "commands" | "timers"; heartbeatInterval?: NodeJS.Timeout },
+        data: {} as {
+            room: "clips" | "chat" | "commands" | "timers";
+            heartbeatInterval?: NodeJS.Timeout;
+        },
         async open(ws) {
             ws.subscribe(ws.data.room);
 
             if (ws.data.room === "commands") {
-                ws.send(JSON.stringify({ type: "allCommands", commands: getUniqueDynamicCommands() }));
-                
+                ws.send(
+                    JSON.stringify({
+                        type: "allCommands",
+                        commands: getUniqueDynamicCommands(),
+                    }),
+                );
+
                 const sysCommands: Record<string, any> = {};
-                for (const cmd of Array.from(new Set(config.commands.system.values()))) {
+                for (const cmd of Array.from(
+                    new Set(config.commands.system.values()),
+                )) {
                     sysCommands[cmd.name] = {
                         name: cmd.name,
                         description: cmd.description,
                         aliases: cmd.aliases || [],
-                        moderatorOnly: cmd.roles.includes("moderator") || cmd.roles.includes("lead_moderator") || cmd.roles.includes("broadcaster"),
+                        moderatorOnly:
+                            cmd.roles.includes("moderator") ||
+                            cmd.roles.includes("lead_moderator") ||
+                            cmd.roles.includes("broadcaster"),
                     };
                 }
-                ws.send(JSON.stringify({ type: "systemCommands", commands: sysCommands }));
+                ws.send(
+                    JSON.stringify({
+                        type: "systemCommands",
+                        commands: sysCommands,
+                    }),
+                );
 
                 const streamInfo = await fetchStreamInfo();
-                ws.send(JSON.stringify({ type: "streamInfo", data: streamInfo }));
+                ws.send(
+                    JSON.stringify({ type: "streamInfo", data: streamInfo }),
+                );
             } else if (ws.data.room === "timers") {
                 const timers = await loadTimers();
-                ws.send(JSON.stringify({ type: "allTimers", timers: getFrontendTimers(timers) }));
+                ws.send(
+                    JSON.stringify({
+                        type: "allTimers",
+                        timers: getFrontendTimers(timers),
+                    }),
+                );
             }
 
-            ws.data.heartbeatInterval = setInterval(
-                () => ws.send("6"),
-                30000,
-            );
+            ws.data.heartbeatInterval = setInterval(() => ws.send("6"), 30000);
         },
         async message(ws, message) {
             const messageStr = message.toString();
@@ -425,35 +470,65 @@ export const server = serve({
             if (ws.data.room === "chat") {
                 if (data.message) {
                     if (data.replyParentMessageId) {
-                        await client.reply(data.replyParentMessageId, data.message);
+                        await client.reply(
+                            data.replyParentMessageId,
+                            data.message,
+                        );
                     } else {
                         await client.say(data.message);
                     }
                 }
             } else if (ws.data.room === "commands") {
                 if (data.action === "getDynamicCommands") {
-                    ws.send(JSON.stringify({ type: "allCommands", commands: getUniqueDynamicCommands() }));
+                    ws.send(
+                        JSON.stringify({
+                            type: "allCommands",
+                            commands: getUniqueDynamicCommands(),
+                        }),
+                    );
                 } else if (data.action === "getSystemCommands") {
                     const sysCommands: Record<string, any> = {};
-                    for (const cmd of Array.from(new Set(config.commands.system.values()))) {
+                    for (const cmd of Array.from(
+                        new Set(config.commands.system.values()),
+                    )) {
                         sysCommands[cmd.name] = {
                             name: cmd.name,
                             description: cmd.description,
                             aliases: cmd.aliases || [],
-                            moderatorOnly: cmd.roles.includes("moderator") || cmd.roles.includes("lead_moderator") || cmd.roles.includes("broadcaster"),
+                            moderatorOnly:
+                                cmd.roles.includes("moderator") ||
+                                cmd.roles.includes("lead_moderator") ||
+                                cmd.roles.includes("broadcaster"),
                         };
                     }
-                    ws.send(JSON.stringify({ type: "systemCommands", commands: sysCommands }));
+                    ws.send(
+                        JSON.stringify({
+                            type: "systemCommands",
+                            commands: sysCommands,
+                        }),
+                    );
                 } else if (data.action === "create") {
                     const { name, response, createdBy, aliases, roles } = data;
-                    if (config.commands.dynamic.has(name) || config.commands.system.has(name)) {
-                        ws.send(JSON.stringify({ error: "Command already exists" }));
+                    if (
+                        config.commands.dynamic.has(name) ||
+                        config.commands.system.has(name)
+                    ) {
+                        ws.send(
+                            JSON.stringify({ error: "Command already exists" }),
+                        );
                         return;
                     }
                     const newCommand: DynamicCommand = {
                         name,
                         response,
-                        roles: roles || ["broadcaster", "moderator", "lead_moderator", "subscriber", "vip", "viewer"],
+                        roles: roles || [
+                            "broadcaster",
+                            "moderator",
+                            "lead_moderator",
+                            "subscriber",
+                            "vip",
+                            "viewer",
+                        ],
                         aliases: aliases || null,
                         createdBy,
                         createdAt: new Date().toISOString(),
@@ -467,7 +542,13 @@ export const server = serve({
                     commands.push(newCommand);
                     await file.write(JSON.stringify(commands, null, 2));
 
-                    server.publish("commands", JSON.stringify({ type: "allCommands", commands: getUniqueDynamicCommands() }));
+                    server.publish(
+                        "commands",
+                        JSON.stringify({
+                            type: "allCommands",
+                            commands: getUniqueDynamicCommands(),
+                        }),
+                    );
                 } else if (data.action === "update") {
                     const { name, response, aliases, roles } = data;
                     const command = config.commands.dynamic.get(name);
@@ -481,7 +562,14 @@ export const server = serve({
 
                     command.response = response;
                     command.aliases = aliases || null;
-                    command.roles = roles || ["broadcaster", "moderator", "lead_moderator", "subscriber", "vip", "viewer"];
+                    command.roles = roles || [
+                        "broadcaster",
+                        "moderator",
+                        "lead_moderator",
+                        "subscriber",
+                        "vip",
+                        "viewer",
+                    ];
 
                     config.commands.dynamic.set(command.name, command);
                     for (const alias of command.aliases ?? [])
@@ -489,12 +577,20 @@ export const server = serve({
 
                     const file = Bun.file("./src/Config/dynamic-commands.json");
                     const commands: DynamicCommand[] = await file.json();
-                    const commandIndex = commands.findIndex((c) => c.name === command.name);
+                    const commandIndex = commands.findIndex(
+                        (c) => c.name === command.name,
+                    );
                     if (commandIndex !== -1) {
                         commands[commandIndex] = command;
                         await file.write(JSON.stringify(commands, null, 2));
                     }
-                    server.publish("commands", JSON.stringify({ type: "allCommands", commands: getUniqueDynamicCommands() }));
+                    server.publish(
+                        "commands",
+                        JSON.stringify({
+                            type: "allCommands",
+                            commands: getUniqueDynamicCommands(),
+                        }),
+                    );
                 } else if (data.action === "delete") {
                     const { name } = data;
                     const command = config.commands.dynamic.get(name);
@@ -508,28 +604,54 @@ export const server = serve({
 
                     const file = Bun.file("./src/Config/dynamic-commands.json");
                     const commands: DynamicCommand[] = await file.json();
-                    const updatedCommands = commands.filter((c) => c.name !== command.name);
+                    const updatedCommands = commands.filter(
+                        (c) => c.name !== command.name,
+                    );
                     await file.write(JSON.stringify(updatedCommands, null, 2));
 
-                    server.publish("commands", JSON.stringify({ type: "allCommands", commands: getUniqueDynamicCommands() }));
+                    server.publish(
+                        "commands",
+                        JSON.stringify({
+                            type: "allCommands",
+                            commands: getUniqueDynamicCommands(),
+                        }),
+                    );
                 }
             } else if (ws.data.room === "timers") {
                 if (data.action === "getAll") {
                     const timers = await loadTimers();
-                    ws.send(JSON.stringify({ type: "allTimers", timers: getFrontendTimers(timers) }));
+                    ws.send(
+                        JSON.stringify({
+                            type: "allTimers",
+                            timers: getFrontendTimers(timers),
+                        }),
+                    );
                 } else if (data.action === "create") {
                     const { name, message, interval } = data;
                     const intervalMs = interval * 60 * 1000;
                     const timers = await loadTimers();
                     if (timers.some((t) => t.name === name)) {
-                        ws.send(JSON.stringify({ error: "Timer already exists" }));
+                        ws.send(
+                            JSON.stringify({ error: "Timer already exists" }),
+                        );
                         return;
                     }
-                    const newTimer: Timer = { name, message, enabled: true, intervalMs };
+                    const newTimer: Timer = {
+                        name,
+                        message,
+                        enabled: true,
+                        intervalMs,
+                    };
                     timers.push(newTimer);
                     await saveTimers(timers);
                     startTimer(newTimer);
-                    server.publish("timers", JSON.stringify({ type: "allTimers", timers: getFrontendTimers(timers) }));
+                    server.publish(
+                        "timers",
+                        JSON.stringify({
+                            type: "allTimers",
+                            timers: getFrontendTimers(timers),
+                        }),
+                    );
                 } else if (data.action === "update") {
                     const { name, message, interval } = data;
                     const intervalMs = interval * 60 * 1000;
@@ -545,7 +667,13 @@ export const server = serve({
                     if (timer.enabled) {
                         startTimer(timer);
                     }
-                    server.publish("timers", JSON.stringify({ type: "allTimers", timers: getFrontendTimers(timers) }));
+                    server.publish(
+                        "timers",
+                        JSON.stringify({
+                            type: "allTimers",
+                            timers: getFrontendTimers(timers),
+                        }),
+                    );
                 } else if (data.action === "toggle") {
                     const { name } = data;
                     const timers = await loadTimers();
@@ -561,14 +689,26 @@ export const server = serve({
                     } else {
                         stopTimer(name);
                     }
-                    server.publish("timers", JSON.stringify({ type: "allTimers", timers: getFrontendTimers(timers) }));
+                    server.publish(
+                        "timers",
+                        JSON.stringify({
+                            type: "allTimers",
+                            timers: getFrontendTimers(timers),
+                        }),
+                    );
                 } else if (data.action === "delete") {
                     const { name } = data;
                     const timers = await loadTimers();
                     const updated = timers.filter((t) => t.name !== name);
                     await saveTimers(updated);
                     stopTimer(name);
-                    server.publish("timers", JSON.stringify({ type: "allTimers", timers: getFrontendTimers(updated) }));
+                    server.publish(
+                        "timers",
+                        JSON.stringify({
+                            type: "allTimers",
+                            timers: getFrontendTimers(updated),
+                        }),
+                    );
                 }
             }
         },
@@ -620,7 +760,10 @@ export const server = serve({
         return Response.json(
             {
                 error: "Internal Server Error",
-                message: Bun.env.NODE_ENV === "development" ? error.message : "Something went wrong",
+                message:
+                    Bun.env.NODE_ENV === "development"
+                        ? error.message
+                        : "Something went wrong",
             },
             {
                 status: 500,
@@ -642,7 +785,9 @@ events.on("auth:update", async () => {
     }
 });
 
-console.log(`Local server running on ${server.url}\nTo terminate the app, press Ctrl+C\n`);
+console.log(
+    `Local server running on ${server.url}\nTo terminate the app, press Ctrl+C\n`,
+);
 
 // Run update checks on startup
 await checkUpdates().catch(console.error);
