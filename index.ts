@@ -14,6 +14,9 @@ import {
     handleLogin,
     handleDisconnect,
     handleCallback,
+    handleSpotifyLogin,
+    handleSpotifyCallback,
+    handleSpotifyDisconnect,
     events,
 } from "./src/Core/RouteFunctions";
 
@@ -176,7 +179,7 @@ for (const timer of await loadTimers()) {
 // Client Chat Message handler
 client.on("channel.chat.message", async (notification) => {
     const message = notification.event.message.text;
-    console.log(message);
+    if (process.env.NODE_ENV === "development") console.log(message);
 
     // Broadcast message to WebSocket chat room
     server.publish(
@@ -401,11 +404,23 @@ export const server = serve({
                     ? { id: tokens.broadcaster.user_id }
                     : null,
                 bot: null,
+                spotify: tokens.spotify
+                    ? {
+                          id: tokens.spotify.user?.id || "Connected",
+                          name:
+                              tokens.spotify.user?.display_name ||
+                              tokens.spotify.user?.id ||
+                              "Connected",
+                      }
+                    : null,
             });
         },
         "/auth/login/:type": handleLogin,
         "/auth/disconnect/:type": { POST: handleDisconnect },
         "/auth/callback": handleCallback,
+        "/auth/spotify/login": handleSpotifyLogin,
+        "/auth/spotify/callback": handleSpotifyCallback,
+        "/auth/spotify/disconnect": { POST: handleSpotifyDisconnect },
     },
 
     websocket: {

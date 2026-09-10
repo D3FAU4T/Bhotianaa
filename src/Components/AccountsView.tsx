@@ -3,7 +3,11 @@ import spotifyLogo from '../Assets/Spotify_Primary_Logo_RGB_Green.png';
 import youtubeLogo from '../Assets/youtube_social_icon_red.png';
 
 interface AccountsViewProps {
-    accounts: { broadcaster: { id: string } | null, bot: { id: string } | null } | null;
+    accounts: {
+        broadcaster: { id: string } | null;
+        bot: { id: string } | null;
+        spotify?: { id: string; name?: string } | null;
+    } | null;
     onRefresh: () => void;
 }
 
@@ -16,6 +20,17 @@ const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
         } catch (e) {
             console.error('Failed to disconnect:', e);
             alert('Failed to disconnect');
+        }
+    };
+
+    const handleSpotifyDisconnect = async () => {
+        if (!confirm('Are you sure you want to disconnect Spotify?')) return;
+        try {
+            await fetch('/auth/spotify/disconnect', { method: 'POST' });
+            onRefresh();
+        } catch (e) {
+            console.error('Failed to disconnect Spotify:', e);
+            alert('Failed to disconnect Spotify');
         }
     };
 
@@ -92,9 +107,7 @@ const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
                     )}
                 </div>
 
-
-
-                {/* Spotify Placeholder */}
+                {/* Spotify */}
                 <div style={{
                     backgroundColor: '#161b22',
                     borderRadius: '1rem',
@@ -104,8 +117,7 @@ const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
                     alignItems: 'center',
                     gap: '1.5rem',
                     border: '1px solid #1db954',
-                    boxShadow: '0 4px 20px rgba(29, 185, 84, 0.1)',
-                    opacity: 0.8
+                    boxShadow: '0 4px 20px rgba(29, 185, 84, 0.15)',
                 }}>
 
                     <div>
@@ -113,33 +125,53 @@ const AccountsView = ({ accounts, onRefresh }: AccountsViewProps) => {
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Spotify</h3>
-                        <p style={{ color: '#888' }}>Song requests and current track display.</p>
+                        <p style={{ color: '#888' }}>Song requests and queue playback control.</p>
+                        {accounts?.spotify && (
+                            <p style={{ color: '#1db954', fontSize: '0.9rem', marginTop: '0.25rem', fontWeight: 600 }}>
+                                Connected {accounts.spotify.name ? `(${accounts.spotify.name})` : ''}
+                            </p>
+                        )}
                     </div>
-                    <div style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '2rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        color: '#ccc',
-                        letterSpacing: '1px'
-                    }}>
-                        COMING SOON
-                    </div>
-                    <button
-                        disabled
-                        style={{
-                            padding: '0.75rem 2rem',
-                            backgroundColor: '#2d3340',
-                            color: '#666',
-                            border: 'none',
-                            borderRadius: '0.5rem',
-                            fontWeight: '600',
-                            cursor: 'not-allowed'
-                        }}
-                    >
-                        Connect Spotify
-                    </button>
+                    {accounts?.spotify ? (
+                        <button
+                            onClick={handleSpotifyDisconnect}
+                            style={{
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Disconnect
+                        </button>
+                    ) : (
+                        <a
+                            href="/auth/spotify/login"
+                            style={{
+                                display: 'inline-block',
+                                padding: '0.75rem 2rem',
+                                backgroundColor: '#1db954',
+                                color: 'white',
+                                textDecoration: 'none',
+                                borderRadius: '0.5rem',
+                                fontWeight: '600',
+                                transition: 'transform 0.2s',
+                                cursor: 'pointer',
+                                fontSize: '1rem'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            Connect Spotify
+                        </a>
+                    )}
                 </div>
 
                 {/* YouTube Placeholder */}

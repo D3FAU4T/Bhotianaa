@@ -75,7 +75,22 @@ export interface Timer {
     enabled: boolean;
 }
 
+export interface SpotifyAuth {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+    token_type: string;
+    scope: string;
+    playlist_id?: string;
+    user?: {
+        id: string;
+        display_name: string;
+        email?: string;
+    };
+}
+
 export interface TokenEnv {
     broadcaster: TwitchAuth | null;
     app: string;
+    spotify?: SpotifyAuth | null;
 }

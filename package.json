@@ -1,25 +1,25 @@
 {
-    "name": "bhotianaa",
-    "module": "index.ts",
-    "type": "module",
-    "private": true,
-    "scripts": {
-        "dev": "bun --env-file=.env.development.local run index.ts",
-        "start": "bun --env-file=.env.production.local run index.ts",
-        "update": "git pull && bun install"
-    },
-    "devDependencies": {
-        "@types/bun": "^1.4.0",
-        "@types/react-dom": "^19.2.4"
-    },
-    "peerDependencies": {
-        "typescript": "^7.0.2"
-    },
-    "dependencies": {
-        "openai": "^7.5.0",
-        "react": "^19.2.8",
-        "react-dom": "^19.2.8",
-        "twitch": "git@github.com:D3FAU4T/Twitch.git",
-        "zod": "^4.4.3"
-    }
+  "name": "bhotianaa",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --env-file=.env.development.local run index.ts",
+    "start": "bun --env-file=.env.production.local run index.ts",
+    "update": "git pull && bun install"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@types/react-dom": "^19.2.5"
+  },
+  "peerDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "openai": "^7.5.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "twitch": "git@github.com:D3FAU4T/Twitch.git",
+    "zod": "^4.4.3"
+  }
 }

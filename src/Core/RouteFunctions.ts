@@ -3,6 +3,12 @@ import { CSRF, type BunRequest } from 'bun';
 import { Auth } from 'twitch';
 import { EventEmitter } from 'node:events';
 import type { TwitchAuth } from '../Typings/TwitchAPI';
+import type { SpotifyAuth } from '../Typings/Bhotianaa';
+import {
+    getSpotifyAuthUrl,
+    exchangeSpotifyCode,
+    disconnectSpotify,
+} from './Spotify';
 
 export const events = new EventEmitter();
 
@@ -12,6 +18,7 @@ export interface TokenStore {
     broadcaster: (TwitchAuth & { user_id?: string }) | null;
     bot: (TwitchAuth & { user_id?: string }) | null;
     app: string | null;
+    spotify?: SpotifyAuth | null;
     conduit_id?: string;
 }
 
@@ -21,21 +28,22 @@ const normalizeTokens = (value: unknown): TokenStore => {
         broadcaster: (obj.broadcaster as TokenStore['broadcaster']) ?? null,
         bot: (obj.bot as TokenStore['bot']) ?? null,
         app: (obj.app as TokenStore['app']) ?? null,
+        spotify: (obj.spotify as TokenStore['spotify']) ?? null,
         conduit_id: (obj.conduit_id as string) || undefined
     };
 };
 
 export const readTokensSafe = async (): Promise<TokenStore> => {
     const file = getTokenFile();
-    if (!await file.exists()) return { broadcaster: null, bot: null, app: null };
+    if (!await file.exists()) return { broadcaster: null, bot: null, app: null, spotify: null };
     try {
         const text = (await file.text()).trim();
-        if (!text) return { broadcaster: null, bot: null, app: null };
+        if (!text) return { broadcaster: null, bot: null, app: null, spotify: null };
         const data = JSON.parse(text);
         return normalizeTokens(data);
     } catch (e) {
         console.error('Error reading tokens file:', e);
-        return { broadcaster: null, bot: null, app: null };
+        return { broadcaster: null, bot: null, app: null, spotify: null };
     }
 };
 
@@ -127,4 +135,50 @@ export const handleCallback = async (req: BunRequest<'/auth/callback'>) => {
     events.emit('auth:update');
 
     return Response.redirect('/');
+};
+
+// -- Spotify Routes --
+
+export const handleSpotifyLogin = () => {
+    try {
+        const authUrl = getSpotifyAuthUrl();
+        return Response.redirect(authUrl);
+    } catch (e: any) {
+        console.error('Error generating Spotify auth URL:', e);
+        return new Response(`Spotify Auth Error: ${e.message}`, { status: 500 });
+    }
+};
+
+export const handleSpotifyCallback = async (req: Request) => {
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const error = url.searchParams.get('error');
+
+    if (error) {
+        console.error('Spotify auth callback returned error:', error);
+        return new Response(`Spotify Auth Failed: ${error}`, { status: 400 });
+    }
+
+    if (!code) {
+        return new Response('No code provided in Spotify callback', { status: 400 });
+    }
+
+    try {
+        const redirectUri = new URL('/auth/spotify/callback', req.url).toString();
+        await exchangeSpotifyCode(code, redirectUri);
+        return Response.redirect('/');
+    } catch (e: any) {
+        console.error('Error processing Spotify callback:', e);
+        return new Response(`Error exchanging Spotify code: ${e.message}`, { status: 500 });
+    }
+};
+
+export const handleSpotifyDisconnect = async () => {
+    try {
+        await disconnectSpotify();
+        return new Response('Spotify disconnected successfully.');
+    } catch (e: any) {
+        console.error('Error disconnecting Spotify:', e);
+        return new Response(`Error disconnecting Spotify: ${e.message}`, { status: 500 });
+    }
 };

@@ -14,7 +14,7 @@ const App = () => {
     const [systemCommands, setSystemCommands] = useState<Record<string, any>>({});
     const [timers, setTimers] = useState<Record<string, any>>({});
 
-    const [accounts, setAccounts] = useState<{ broadcaster: { id: string } | null, bot: { id: string } | null } | null>(null);
+    const [accounts, setAccounts] = useState<{ broadcaster: { id: string } | null, bot: { id: string } | null, spotify?: { id: string, name?: string } | null } | null>(null);
     const [streamInfo, setStreamInfo] = useState<{ title: string, gameName: string, gameArt: string, channelName: string, isLive?: boolean } | null>(null);
     const [layoutOrder, setLayoutOrder] = useState<string[]>(['dynamicCommands', 'systemCommands', 'timers', 'accounts', 'streamInfo']);
     const [isEditMode, setIsEditMode] = useState(false);

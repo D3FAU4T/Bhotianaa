@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import type { TokenEnv, Command, DynamicCommand, Timer } from '../Typings/Bhotianaa';
 import type { ChatCompletion } from "openai/resources/chat/completions";
+import { getValidSpotifyToken } from "./Spotify";
 
 interface Operation {
     readonly result: number;
@@ -119,6 +120,14 @@ export const revalidateTokens = async () => {
             await envFile.write(JSON.stringify(env, null, 4));
         } else {
             console.error("Failed to refresh app access token:", newToken);
+        }
+    }
+
+    if (env.spotify) {
+        try {
+            await getValidSpotifyToken();
+        } catch (e) {
+            console.warn("Failed to revalidate Spotify token:", e);
         }
     }
 
