@@ -1,3 +1,39 @@
+export interface FreeDictionaryAPISense {
+    definition: string;
+    tags?: string[];
+    examples?: string[];
+    quotes?: string[];
+    synonyms?: string[];
+    antonyms?: string[];
+    subsenses?: FreeDictionaryAPISense[];
+}
+
+export interface FreeDictionaryAPIEntry {
+    language?: {
+        code: string;
+        name: string;
+    };
+    partOfSpeech?: string;
+    pronunciations?: any[];
+    forms?: any[];
+    senses: FreeDictionaryAPISense[];
+    synonyms?: string[];
+    antonyms?: string[];
+}
+
+export interface FreeDictionaryAPIResponse {
+    word: string;
+    entries: FreeDictionaryAPIEntry[];
+    source?: {
+        url?: string;
+        license?: {
+            name: string;
+            url: string;
+        };
+    };
+    message?: string;
+}
+
 export interface DictionaryAPI {
     word: string;
     phonetic: string;

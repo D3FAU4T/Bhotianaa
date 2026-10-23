@@ -1,5 +1,5 @@
 import type { Command } from '../Typings/Bhotianaa';
-import type { DictionaryAPI, DictionaryAPIError } from '../Typings/DictionaryAPI';
+import type { FreeDictionaryAPIResponse } from '../Typings/DictionaryAPI';
 
 export default <Command> {
     name: 'define',
@@ -18,7 +18,7 @@ export default <Command> {
 
         const word = args.join(' ').trim();
 
-        const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const response = await fetch(`https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`);
 
         if (!response.ok) {
             return await client.reply(
@@ -27,18 +27,17 @@ export default <Command> {
             );
         }
         
-        const result = await response.json() as DictionaryAPI[] | DictionaryAPIError;
+        const result = await response.json() as FreeDictionaryAPIResponse;
 
-        if (!Array.isArray(result))
-            return await client.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
+        const definition = result?.entries?.[0]?.senses?.[0]?.definition;
 
-        if (result[0] && result[0].meanings[0] && result[0].meanings[0].definitions[0])
+        if (definition) {
             await client.reply(
                 notification.event.message_id,
-                `${word}: ${result[0].meanings[0].definitions[0].definition}`
+                `${word}: ${definition}`
             );
-
-        else
+        } else {
             await client.say(`Oh no, I don't know the definition of ${word}, Mamma help D:`);
+        }
     }
 };

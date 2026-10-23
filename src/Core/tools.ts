@@ -2,6 +2,7 @@ import { z } from "zod";
 import { tool } from "./Functions";
 import { Helix } from "twitch";
 import { client, config } from "../../index";
+import type { FreeDictionaryAPIResponse } from "../Typings/DictionaryAPI";
 
 const change_title = tool({
     name: "change_stream_title",
@@ -71,18 +72,18 @@ const define_word = tool({
         word: z.string().describe("The word to define.")
     },
     implementation: async ({ word }) => {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const res = await fetch(`https://freedictionaryapi.com/api/v1/entries/en/${encodeURIComponent(word)}`);
 
         if (!res.ok) {
             await client.say(`The server is unreachable. Please try again later.`);
             return;
         }
 
-        const data = await res.json();
+        const data = await res.json() as FreeDictionaryAPIResponse;
+        const definition = data?.entries?.[0]?.senses?.[0]?.definition;
 
-        if (Array.isArray(data) && data[0] && data[0].meanings[0] && data[0].meanings[0].definitions[0])
-            await client.say(`${word}: ${data[0].meanings[0].definitions[0].definition}`);
-
+        if (definition)
+            await client.say(`${word}: ${definition}`);
         else
             await client.say(`No definition found for ${word}`);
     }

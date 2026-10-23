@@ -9,6 +9,7 @@ import {
     loadTimers,
     checkUpdates,
 } from "./src/Core/Functions";
+
 import {
     readTokensSafe,
     handleLogin,

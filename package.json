@@ -9,17 +9,17 @@
     "update": "git pull && bun install"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.0",
-    "@types/react-dom": "^19.2.5"
+    "@types/bun": "^1.4.4",
+    "@types/react-dom": "^19.3.0"
   },
   "peerDependencies": {
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "openai": "^7.5.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "openai": "^7.43.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "twitch": "git@github.com:D3FAU4T/Twitch.git",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   }
 }
