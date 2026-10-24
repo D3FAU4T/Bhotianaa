@@ -728,7 +728,7 @@ export const server = serve({
                 }
             }
         },
-        close(ws, code, reason) {
+        close(ws, _code, _reason) {
             if (ws.data.heartbeatInterval)
                 clearInterval(ws.data.heartbeatInterval);
 

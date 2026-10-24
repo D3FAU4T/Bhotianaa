@@ -16,10 +16,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "openai": "^7.43.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "twitch": "git@github.com:D3FAU4T/Twitch.git",
-    "zod": "^4.6.7"
+    "twitch": "git@github.com:D3FAU4T/Twitch.git"
   }
 }

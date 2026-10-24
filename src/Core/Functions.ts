@@ -1,9 +1,7 @@
-import { z } from "zod";
 import { Auth } from "twitch";
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import type { TokenEnv, Command, DynamicCommand, Timer } from '../Typings/Bhotianaa';
-import type { ChatCompletion } from "openai/resources/chat/completions";
 import { getValidSpotifyToken } from "./Spotify";
 
 interface Operation {
@@ -193,97 +191,6 @@ export const getChatterRole = (badges: string[]) => {
         return 'vip';
 
     return 'viewer';
-}
-
-interface ToolDefinition<T extends z.ZodRawShape> {
-    name: string;
-    description: string;
-    parameters: T;
-    implementation: (args: z.infer<z.ZodObject<T>>) => any | Promise<any>;
-}
-
-export const tool = <T extends z.ZodRawShape>(def: ToolDefinition<T>) => {
-    const schema = z.object(def.parameters);
-
-    const rawJsonSchema = schema.toJSONSchema();
-
-    const { $schema, ...parameters } = rawJsonSchema;
-
-    return {
-        name: def.name,
-        openAiSchema: {
-            type: "function",
-            function: {
-                name: def.name,
-                description: def.description,
-                parameters,
-            }
-        },
-
-        execute: async (argsString: string) => {
-            const parsedArgs = JSON.parse(argsString);
-            const validArgs = schema.parse(parsedArgs);
-            return await def.implementation(validArgs);
-        }
-    }
-}
-
-type AiOpts = {
-    model: string;
-    messages: { role: "system" | "user" | "assistant"; content: string }[];
-    tools?: ReturnType<typeof tool>[];
-    max_tokens?: number;
-}
-
-export const act = async (opts: AiOpts) => {
-    const url = "http://192.168.0.199:8000/v1/chat/completions";
-
-    const res = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            model: opts.model,
-            messages: opts.messages,
-            tools: opts.tools?.map(tool => tool.openAiSchema),
-            tool_choice: "auto",
-            max_output_tokens: opts.max_tokens ?? 50
-        })
-    });
-
-    if (!res.ok) {
-        console.error(`API Error: ${res.status} ${res.statusText}`);
-        return;
-    }
-
-    const data = await res.json() as ChatCompletion;
-    
-    if (data.choices[0]) {
-        const message = data.choices[0].message;
-
-        if (message.tool_calls) {
-            for (const toolCall of message.tool_calls) {
-                // @ts-ignore
-                const toolName = toolCall.function.name;
-                // @ts-ignore
-                const toolArgs = toolCall.function.arguments;
-
-                const toolToExecute = opts.tools?.find(t => t.name === toolName);
-
-                if (toolToExecute) {
-                    await toolToExecute.execute(toolArgs);
-                    return;
-                }
-                
-                else
-                    console.warn(`Tool "${toolName}" not found in provided tools.`);                
-            }
-        }
-
-        else
-            return message;
-    }
 }
 
 export const checkUpdates = async (): Promise<void> => {

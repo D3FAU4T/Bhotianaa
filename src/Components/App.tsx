@@ -207,7 +207,7 @@ const App = () => {
         e.currentTarget.classList.add('dragging');
     };
 
-    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+    const handleDragEnter = (_e: React.DragEvent<HTMLDivElement>, position: number) => {
         if (!isEditMode) return;
         dragOverItem.current = position;
     };
