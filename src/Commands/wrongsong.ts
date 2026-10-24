@@ -1,12 +1,9 @@
 import type { Command } from '../Typings/Bhotianaa';
-import {
-    getValidSpotifyToken,
-    removeTrackFromPlaylist,
-} from '../Core/Spotify';
+import { getValidSpotifyToken, markWrongSong } from '../Core/Spotify';
 import { getChatterRole } from '../Core/Functions';
 
 export default <Command>{
-    name: 'remove',
+    name: 'wrongsong',
     description: 'Removes your requested song from the song request queue',
     roles: ['broadcaster', 'moderator', 'lead_moderator', 'vip', 'subscriber', 'viewer'],
     aliases: ['removesong', 'delsong', 'cancelsr'],
@@ -30,7 +27,7 @@ export default <Command>{
         const chatterName = notification.event.chatter_user_name || notification.event.chatter_user_login;
         const chatterId = notification.event.chatter_user_id;
 
-        const removedTrack = await removeTrackFromPlaylist(
+        const removedTrack = await markWrongSong(
             {
                 name: chatterName,
                 id: chatterId,

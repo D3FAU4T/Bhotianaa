@@ -81,7 +81,6 @@ export interface SpotifyAuth {
     expires_at: number;
     token_type: string;
     scope: string;
-    playlist_id?: string;
     user?: {
         id: string;
         display_name: string;

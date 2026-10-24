@@ -1,16 +1,9 @@
 import type { Command } from '../Typings/Bhotianaa';
 import {
     searchSpotifyTrack,
-    addTrackToPlaylistAndPlay,
+    addTrackToQueue,
     getValidSpotifyToken,
 } from '../Core/Spotify';
-
-const formatDuration = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
 
 export default <Command>{
     name: 'sr',
@@ -30,7 +23,6 @@ export default <Command>{
 
         const query = message.slice(firstSpaceIndex + 1).trim();
 
-        // Check if Spotify is authenticated
         const token = await getValidSpotifyToken();
         if (!token) {
             return await client.reply(
@@ -48,24 +40,21 @@ export default <Command>{
                 );
             }
 
-            const queueResult = await addTrackToPlaylistAndPlay(track, {
+            const queueResult = await addTrackToQueue(track, {
                 name: notification.event.chatter_user_name || notification.event.chatter_user_login,
                 id: notification.event.chatter_user_id,
             });
 
-            const duration = formatDuration(track.durationMs);
             const artistNames = track.artists.join(', ');
+            const totalSeconds = Math.floor(track.durationMs / 1000);
+            const duration = `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
 
             if (!queueResult.success) {
-                if (queueResult.message) {
-                    return await client.reply(
-                        notification.event.message_id,
-                        `Found "${track.name}" by ${artistNames}, but ${queueResult.message}`
-                    );
-                }
                 return await client.reply(
                     notification.event.message_id,
-                    `Failed to add "${track.name}" by ${artistNames} to the Spotify playlist.`
+                    queueResult.message
+                        ? `Found "${track.name}" by ${artistNames}, but ${queueResult.message}`
+                        : `Failed to add "${track.name}" by ${artistNames} to the Spotify queue.`
                 );
             }
 
