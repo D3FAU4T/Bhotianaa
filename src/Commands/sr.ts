@@ -8,7 +8,7 @@ import {
 export default <Command>{
     name: 'sr',
     description: 'Requests a song on Spotify and adds it to the queue',
-    roles: ['broadcaster', 'moderator', 'lead_moderator', 'vip', 'subscriber', 'viewer'],
+    roles: ['broadcaster', 'moderator', 'lead_moderator'],
     aliases: ['songrequest', 'spotify'],
     async execute(notification, client) {
         const message = notification.event.message.text.trim();

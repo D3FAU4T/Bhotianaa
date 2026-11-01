@@ -161,6 +161,21 @@ export const disconnectSpotify = async (): Promise<void> => {
     events.emit('auth:update');
 };
 
+export const isSpotifyOpen = async (): Promise<boolean> => {
+    const token = await getValidSpotifyToken();
+    if (!token) return false;
+    try {
+        const res = await fetch(`${SPOTIFY_API_BASE}/me/player/devices`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return false;
+        const data = await res.json() as { devices: any[] };
+        return Array.isArray(data.devices) && data.devices.length > 0;
+    } catch {
+        return false;
+    }
+};
+
 export interface TrackInfo {
     uri: string;
     id: string;
@@ -227,6 +242,7 @@ export interface SongRequest {
     requestedBy: string;
     requestedByUserId: string;
     requestedAt: number;
+    redemptionId?: string;
 }
 
 const songRequests: SongRequest[] = [];
@@ -263,7 +279,8 @@ const checkAndSkipWrongSong = async () => {
 
 export const addTrackToQueue = async (
     track: TrackInfo,
-    user: { name: string; id: string }
+    user: { name: string; id: string },
+    redemptionId?: string
 ): Promise<{ success: boolean; message?: string }> => {
     const token = await getValidSpotifyToken();
     if (!token) throw new Error('Spotify is not connected.');
@@ -335,6 +352,7 @@ export const addTrackToQueue = async (
         requestedBy: user.name,
         requestedByUserId: user.id,
         requestedAt: Date.now(),
+        redemptionId,
     });
     if (songRequests.length > 100) songRequests.shift();
 
@@ -344,7 +362,7 @@ export const addTrackToQueue = async (
 export const markWrongSong = async (
     user: { name: string; id: string; isMod?: boolean },
     query?: string
-): Promise<TrackInfo | null> => {
+): Promise<{ track: TrackInfo; redemptionId?: string } | null> => {
     let idx = -1;
     if (query) {
         const q = query.toLowerCase();
@@ -364,6 +382,7 @@ export const markWrongSong = async (
     if (!removed) return null;
 
     const track = removed.track;
+    const redemptionId = removed.redemptionId;
     wrongSongUris.add(track.uri);
     wrongSongUris.add(track.id);
 
@@ -374,7 +393,7 @@ export const markWrongSong = async (
             wrongSongUris.delete(track.uri);
             wrongSongUris.delete(track.id);
             await skipSpotifyTrack();
-            return track;
+            return { track, redemptionId };
         }
     } catch {}
 
@@ -383,7 +402,7 @@ export const markWrongSong = async (
         wrongSongWatcherTimer = setInterval(checkAndSkipWrongSong, 1500);
     }
 
-    return track;
+    return { track, redemptionId };
 };
 
 export const skipSpotifyTrack = async (): Promise<{ success: boolean; message?: string; track?: TrackInfo | null }> => {

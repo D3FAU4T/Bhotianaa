@@ -20,6 +20,11 @@ import {
     handleSpotifyDisconnect,
     events,
 } from "./src/Core/RouteFunctions";
+import {
+    isSpotifyOpen,
+    searchSpotifyTrack,
+    addTrackToQueue,
+} from "./src/Core/Spotify";
 
 import type { BotState, DynamicCommand, Timer } from "./src/Typings/Bhotianaa";
 
@@ -180,7 +185,8 @@ for (const timer of await loadTimers()) {
 // Client Chat Message handler
 client.on("channel.chat.message", async (notification) => {
     const message = notification.event.message.text;
-    if (process.env.NODE_ENV === "development") console.log(message);
+    if (process.env.NODE_ENV === "development")
+        (message);
 
     // Broadcast message to WebSocket chat room
     server.publish(
@@ -384,6 +390,83 @@ client.on(
                     `@${notification.event.user_login} Sorry, something went wrong with the gamble!`,
                 );
             }
+        }
+
+        // Song Request Reward
+        if (
+            notification.event.reward.id ===
+            "c34e696f-79a9-4c86-9e57-bf74c9b2a9bb"
+        ) {
+            const userInput = notification.event.user_input?.trim();
+            const redemptionId = notification.event.id;
+            const rewardId = notification.event.reward.id;
+            const userLogin = notification.event.user_login;
+            const accessToken = config.env.broadcaster?.access_token;
+
+            const cancelRedemption = async () => {
+                if (!accessToken) return;
+                await fetch(
+                    `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?broadcaster_id=${Bun.env.BROADCASTER_USER_ID}&reward_id=${rewardId}&id=${redemptionId}`,
+                    {
+                        method: "PATCH",
+                        headers: {
+                            "Client-Id": Bun.env.TWITCH_CLIENT_ID!,
+                            Authorization: `Bearer ${accessToken}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ status: "CANCELED" }),
+                    },
+                ).catch(() => {});
+            };
+
+            if (!(await isSpotifyOpen())) {
+                await cancelRedemption();
+                await client.say(
+                    `@${userLogin} my mamma does not have spotify open, so I'm refunding the points.`,
+                );
+                return;
+            }
+
+            if (!userInput) {
+                await cancelRedemption();
+                await client.say(
+                    `@${userLogin} Please provide a song name or Spotify link! Refunding your points.`,
+                );
+                return;
+            }
+
+            const track = await searchSpotifyTrack(userInput);
+            if (!track) {
+                await cancelRedemption();
+                await client.say(
+                    `@${userLogin} Couldn't find "${userInput}" on Spotify! Refunding your points.`,
+                );
+                return;
+            }
+
+            const queueResult = await addTrackToQueue(
+                track,
+                {
+                    name: notification.event.user_name || userLogin,
+                    id: notification.event.user_id,
+                },
+                redemptionId,
+            );
+
+            if (!queueResult.success) {
+                await cancelRedemption();
+                await client.say(
+                    `@${userLogin} my mamma does not have spotify open, so I'm refunding the points.`,
+                );
+                return;
+            }
+
+            const artistNames = track.artists.join(", ");
+            const totalSeconds = Math.floor(track.durationMs / 1000);
+            const duration = `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, "0")}`;
+            await client.say(
+                `🎶 Added to queue: "${track.name}" by ${artistNames} [${duration}]`,
+            );
         }
     },
 );
