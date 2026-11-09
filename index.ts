@@ -55,13 +55,16 @@ export const config: BotState = {
 setInterval(
     async () => {
         config.env = await revalidateTokens();
+        if (client && config.env?.app) {
+            client.setAccessToken(config.env.app);
+        }
     },
     1000 * 60 * 60,
 );
 
 export const client = new Client({
     clientId: Bun.env.TWITCH_CLIENT_ID,
-    accessToken: config.env?.app,
+    accessToken: () => config.env?.app,
     broadcasterUserId: Bun.env.BROADCASTER_USER_ID,
     userId: Bun.env.BOT_USER_ID,
 });
@@ -878,9 +881,8 @@ export const server = serve({
 events.on("auth:update", async () => {
     console.log("🔄 Auth updated! Reloading config...");
     config.env = await revalidateTokens();
-    if (client && config.env) {
-        // @ts-ignore
-        client.options.accessToken = config.env.app;
+    if (client && config.env?.app) {
+        client.setAccessToken(config.env.app);
     }
 });
 
