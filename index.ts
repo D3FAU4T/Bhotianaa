@@ -1,4 +1,5 @@
 import { Client, Helix } from "twitch";
+import { EmbedBuilder } from "@discordjs/builders";
 import { serve } from "bun";
 import { subscribe } from "./src/Core/SubscribingEvents";
 import {
@@ -260,6 +261,7 @@ client.on("channel.chat.message", async (notification) => {
 // Stream Online handler
 client.on("stream.online", async (notification) => {
     config.streamInfo.startedAt = notification.event.started_at;
+    config.streamInfo.streamId = notification.event.id;
 
     const accessToken = config.env.broadcaster?.access_token || config.env.app;
     const result = await Helix.Channel.get(Bun.env.BROADCASTER_USER_ID, {
@@ -270,6 +272,8 @@ client.on("stream.online", async (notification) => {
     if (!result.is_success || !result.data[0]) return;
 
     const data = result.data[0];
+    config.streamInfo.title = data.title;
+    config.streamInfo.broadcasterName = data.broadcaster_name;
 
     // Words On Stream
     if (data.game_id === "512821")
@@ -287,43 +291,35 @@ client.on("stream.online", async (notification) => {
         box_art_url: "",
     };
 
+    const liveEmbed = new EmbedBuilder()
+        .setTitle("Streaming time!")
+        .setDescription(data.title)
+        .setURL("https://twitch.tv/gianaa_")
+        .setColor(11342935)
+        .setThumbnail("https://assets.stickpng.com/images/580b57fcd9996e24bc43c540.png")
+        .setImage("https://cdn.discordapp.com/attachments/1005205775150481428/1223977843558453258/3.png")
+        .setAuthor({
+            name: "Gianaa_",
+            iconURL: "https://static-cdn.jtvnw.net/jtv_user_pictures/d5d50ee0-daa8-4ab0-9d67-1c14b4762c25-profile_image-70x70.jpeg",
+        })
+        .setFooter({
+            text: "Yay! I created the Embed",
+            iconURL: "https://images-ext-1.discordapp.net/external/xeu1afV92cXfj9ICm7f0Ll52ughrWfj4RR5MHv0S_Kg/https/cdn.discordapp.com/icons/1005194560303013920/581e47ff8e43bd2680c160bf1c21fa33.webp",
+        })
+        .addFields(
+            { name: "Game", value: data.game_name, inline: true },
+            { name: "Viewers Count", value: "3", inline: true },
+        );
+
     const payload = {
         content: `@everyone My Mamma is live on twitch and streaming ${data.game_name}`,
-        embeds: [
-            {
-                title: "Streaming time!",
-                description: `${data.title}`,
-                url: "https://twitch.tv/gianaa_",
-                color: 11342935,
-                thumbnail: {
-                    url: "https://assets.stickpng.com/images/580b57fcd9996e24bc43c540.png",
-                },
-                image: {
-                    url: "https://cdn.discordapp.com/attachments/1005205775150481428/1223977843558453258/3.png",
-                },
-                author: {
-                    name: "Gianaa_",
-                    icon_url:
-                        "https://cdn.discordapp.com/avatars/748141473513603164/e94ba01ce421ec5d483ad9ec8c209e34.webp?size=128",
-                },
-                footer: {
-                    text: "Yay! I created the Embed",
-                    icon_url:
-                        "https://images-ext-1.discordapp.net/external/xeu1afV92cXfj9ICm7f0Ll52ughrWfj4RR5MHv0S_Kg/https/cdn.discordapp.com/icons/1005194560303013920/581e47ff8e43bd2680c160bf1c21fa33.webp",
-                },
-                fields: [
-                    {
-                        name: "Game",
-                        value: `${data.game_name}`,
-                        inline: true,
-                    },
-                    { name: "Viewers Count", value: 3, inline: true },
-                ],
-            },
-        ],
+        embeds: [liveEmbed.toJSON()],
     };
 
-    const discordNotification = await fetch(Bun.env.DISCORD_WEBHOOK_URL, {
+    const webhookUrl = new URL(Bun.env.DISCORD_WEBHOOK_URL);
+    webhookUrl.searchParams.set("wait", "true");
+
+    const discordNotification = await fetch(webhookUrl.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -335,6 +331,134 @@ client.on("stream.online", async (notification) => {
         );
         return;
     }
+
+    try {
+        const messageData = (await discordNotification.json()) as { id?: string };
+        if (messageData?.id) {
+            config.streamInfo.discordMessageId = messageData.id;
+        }
+    } catch (e) {
+        console.error("Failed to parse Discord notification response:", e);
+    }
+});
+
+// Stream Offline handler
+client.on("stream.offline", async () => {
+    const messageId = config.streamInfo.discordMessageId;
+    if (!messageId) {
+        config.streamInfo = {
+            game: null,
+            startedAt: null,
+            streamId: null,
+            discordMessageId: null,
+            title: null,
+            broadcasterName: null,
+        };
+        return;
+    }
+
+    const creds = {
+        clientId: Bun.env.TWITCH_CLIENT_ID!,
+        accessToken: config.env.broadcaster?.access_token || config.env.app,
+    };
+
+    let vodField: { name: string; value: string; inline: boolean } | null = null;
+    const videosRes = await Helix.Videos.get(
+        {
+            user_id: Bun.env.BROADCASTER_USER_ID,
+            type: "archive",
+            first: "5",
+        },
+        creds,
+    );
+
+    if (videosRes.is_success && videosRes.data) {
+        const vod = videosRes.data.find(
+            (v) => config.streamInfo.streamId && (v as any).stream_id === config.streamInfo.streamId,
+        );
+        if (vod) {
+            vodField = {
+                name: "VOD",
+                value: `${vod.duration}, [Click to view](${vod.url})`,
+                inline: true,
+            };
+        }
+    }
+
+    const now = new Date();
+    let durationStr = "a few moments";
+    if (config.streamInfo.startedAt) {
+        const diffMs = Math.max(0, now.getTime() - new Date(config.streamInfo.startedAt).getTime());
+        const totalMinutes = Math.floor(diffMs / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        if (hours === 0) durationStr = `${minutes} minute${minutes === 1 ? "" : "s"}`;
+        else if (minutes === 0) durationStr = `${hours} hour${hours === 1 ? "" : "s"}`;
+        else durationStr = `${hours} hour${hours === 1 ? "" : "s"} ${minutes} minute${minutes === 1 ? "" : "s"}`;
+    }
+
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const offlineStr = `${day}/${month}/${year} ${hours}:${minutes}`;
+
+    const offlineEmbed = new EmbedBuilder()
+        .setAuthor({
+            name: `${config.streamInfo.broadcasterName || "Gianaa_"} was live on Twitch`,
+            iconURL: "https://static-cdn.jtvnw.net/jtv_user_pictures/d5d50ee0-daa8-4ab0-9d67-1c14b4762c25-profile_image-70x70.jpeg",
+        })
+        .setColor(6569636)
+        .addFields({
+            name: "Game",
+            value: config.streamInfo.game?.name || "Offline",
+            inline: true,
+        })
+        .setFooter({
+            text: `Online for ${durationStr} | Offline at - ${offlineStr}`,
+            iconURL: "https://assets.stickpng.com/images/580b57fcd9996e24bc43c540.png",
+        });
+
+    if (config.streamInfo.title) offlineEmbed.setDescription(`**${config.streamInfo.title}**`);
+    if (vodField) offlineEmbed.addFields(vodField);
+
+    const editPayload = {
+        content: "",
+        embeds: [offlineEmbed.toJSON()],
+    };
+
+    if (!Bun.env.DISCORD_WEBHOOK_URL) return;
+    const webhookBase = Bun.env.DISCORD_WEBHOOK_URL.split("?")[0]?.replace(/\/+$/, "") || "";
+    await fetch(`${webhookBase}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editPayload),
+    }).catch((err) => console.error("Failed to update Discord offline notification:", err));
+
+    config.streamInfo = {
+        game: null,
+        startedAt: null,
+        streamId: null,
+        discordMessageId: null,
+        title: null,
+        broadcasterName: null,
+    };
+
+    if (config.wos.enabled) {
+        config.wos = {
+            enabled: false,
+            word: null,
+            msgCount: 0,
+            msgQueue: [],
+        };
+    }
+});
+
+// Follow handler
+client.on("channel.follow", async (notification) => {
+    const follower = notification.event.user_name || notification.event.user_login;
+    await client.say(`@${follower}, Thank you for following my mamma 😊`);
 });
 
 // Reward Redemption handler

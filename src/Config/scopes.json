@@ -12,7 +12,8 @@
         "moderator:manage:announcements",
         "moderator:manage:shoutouts",
         "channel:manage:redemptions",
-        "channel:bot"
+        "channel:bot",
+        "moderator:read:followers"
     ],
     "app": [
         "user:bot",

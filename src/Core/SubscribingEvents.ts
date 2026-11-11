@@ -17,6 +17,14 @@ export const subscribe = async (client: Client) => {
             }
         },
         {
+            type: 'channel.follow',
+            version: '2',
+            condition: {
+                broadcaster_user_id: Bun.env.BROADCASTER_USER_ID,
+                moderator_user_id: Bun.env.BROADCASTER_USER_ID
+            }
+        },
+        {
             type: 'channel.channel_points_custom_reward_redemption.add',
             version: '1',
             condition: {

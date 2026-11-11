@@ -17,6 +17,10 @@ export interface BotState {
     streamInfo: {
         game: ExtractData<Unwrapped>[0] | null;
         startedAt: string | null;
+        streamId?: string | null;
+        discordMessageId?: string | null;
+        title?: string | null;
+        broadcasterName?: string | null;
     };
     commands: {
         system: Map<string, Command>;
